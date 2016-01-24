@@ -18,17 +18,19 @@ public enum MongoClient {
 
 	INSTANCE;
 
-    private static final String DATA_CENTER_COLLECTION = "dataCenter";
+	private Logger logger = null;
+	private static final String DATA_CENTER_COLLECTION = "dataCenter";
+
 	private static final String MASTER_SLAVE_COLLECTION = "masterSlave";
 
 	MongoDatabase database;
-    
-    MongoCollection dataCenter;
-    MongoCollection masterSlave;
-    
-    Logger logger = LoggerFactory.getLogger(MongoClient.class);
+	MongoCollection dataCenter;
 
-    private MongoClient() throws Exception {
+    MongoCollection masterSlave;
+
+    MongoClient() {
+
+		logger = LoggerFactory.getLogger(MongoClient.class);
     	
     	database = connect();
 
@@ -36,7 +38,7 @@ public enum MongoClient {
 		masterSlave		= database.getCollection(MASTER_SLAVE_COLLECTION);
     }
 
-	private MongoDatabase connect() throws Exception {
+	private MongoDatabase connect(){
 		MongoClientConfiguration config = new MongoClientConfiguration();
     	config.addServer(ConfigurationUtil.getMongodbHost() + ":" + ConfigurationUtil.getMongodbPort());
     	config.setMaxConnectionCount(10);

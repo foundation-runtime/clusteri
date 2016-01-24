@@ -8,6 +8,7 @@ import com.cisco.oss.foundation.configuration.ConfigurationFactory;
 public class ConfigurationUtil {
 
     public static final String INSTANCE_ID = getUniqueProcessName();
+    public static final String COMPONENT_NAME = getComponentName();
 
     public static final String ACTIVE_DATA_CENTER = System.getenv("DATA_CENTER");
 
@@ -23,7 +24,7 @@ public class ConfigurationUtil {
     }
 
     public static String getMongodbName() {
-        return configuration.getString("service.mongo.db.name");
+        return configuration.getString("service.mongo.db.name", "cluster-db");
     }
 
     public static int getMongoBatchSize() {
@@ -31,15 +32,15 @@ public class ConfigurationUtil {
     }
 
     public static Boolean getIsMongodbAuthenticationEnabled() {
-        return configuration.getBoolean("service.mongo.authenticationEnabled");
+        return configuration.getBoolean("service.mongo.authenticationEnabled",false);
     }
 
     public static Boolean getIsMongodbEncryptedPassword() {
-        return configuration.getBoolean("service.mongo.isPasswordEncrypted");
+        return configuration.getBoolean("service.mongo.isPasswordEncrypted", false);
     }
 
     public static int getMasterSlaveLeaseTime(String name) {
-        return configuration.getInt(name + ".masterSlave.leaseTime");
+        return configuration.getInt(name + ".masterSlave.leaseTime", 30);
     }
 
     public static String getMongodbUserName() {
@@ -54,11 +55,14 @@ public class ConfigurationUtil {
 
         String rpmSoftwareName = getComponentName();
 
-        StringBuilder uniqueProcName = new StringBuilder(System.getenv(CcpConstants.FQDN));
+        StringBuilder uniqueProcName = new StringBuilder();
+        uniqueProcName.append(System.getenv(CcpConstants.FQDN));
         uniqueProcName.append("-").append(rpmSoftwareName);
         uniqueProcName.append("-").append(System.getenv(CcpConstants.ARTIFACT_VERSION));
-        uniqueProcName.append("-").append(System.getenv(CcpConstants.INSTALL_DIR).replaceAll("/", "_"));
-
+        String installDir = System.getenv(CcpConstants.INSTALL_DIR);
+        if(installDir != null){
+            uniqueProcName.append("-").append(System.getenv(CcpConstants.INSTALL_DIR).replaceAll("/", "_"));
+        }
 
         return uniqueProcName.toString();
 
