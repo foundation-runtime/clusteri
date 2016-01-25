@@ -11,6 +11,10 @@ import com.allanbank.mongodb.MongoCollection;
 import com.allanbank.mongodb.MongoDatabase;
 import com.allanbank.mongodb.MongoFactory;
 
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+
 /**
  * Created by igreenfi on 9/21/2015.
  */
@@ -36,7 +40,7 @@ public enum MongoClient {
 
 		dataCenter	= database.getCollection(DATA_CENTER_COLLECTION);
 		masterSlave		= database.getCollection(MASTER_SLAVE_COLLECTION);
-    }
+	}
 
 	private MongoDatabase connect(){
 		MongoClientConfiguration config = new MongoClientConfiguration();

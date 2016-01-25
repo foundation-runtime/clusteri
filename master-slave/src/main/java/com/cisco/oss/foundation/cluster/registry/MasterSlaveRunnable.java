@@ -13,6 +13,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+
 /**
  * Created by Yair Ogen (yaogen) on 24/01/2016.
  */
@@ -20,18 +23,25 @@ public class MasterSlaveRunnable implements Runnable {
     private static final Logger LOGGER = LoggerFactory.getLogger(MasterSlaveRunnable.class);
     private String name;
     private MasterSlaveListener masterSlaveListener;
-    private final String id = ConfigurationUtil.COMPONENT_NAME + "-" + name;
+    private String id = null;
     private final String instanceId = ConfigurationUtil.INSTANCE_ID;
     private MongoClient mongoClient = MongoClient.INSTANCE;
 
     public MasterSlaveRunnable(String name, MasterSlaveListener masterSlaveListener) {
         this.name = name;
         this.masterSlaveListener = masterSlaveListener;
+        this.id = ConfigurationUtil.COMPONENT_NAME + "-" + name;
     }
 
     @Override
     public void run() {
 
+        //sleep a bit until the async load and connection to DB is finished.
+        try {
+            TimeUnit.SECONDS.sleep(2);
+        } catch (InterruptedException e) {
+            LOGGER.error("INTERRUPTED");
+        }
 
         Boolean runThread = MasterSlaveRegistry.INSTANCE.threadController.getOrDefault(name, Boolean.TRUE);
 
@@ -41,24 +51,26 @@ public class MasterSlaveRunnable implements Runnable {
 
                 boolean isActiveDC = isActiveDC();
 
+                int masterSlaveLeaseTime = ConfigurationUtil.getMasterSlaveLeaseTime(name);
                 if (isActiveDC) {
 
                     long timestamp = System.currentTimeMillis();
 
 
                     MongoCollection masterSlaveCollection = mongoClient.getMasterSlaveCollection();
-                    Find.Builder builder1 = Find.builder();
-                    Find.Builder builder = builder1.query(QueryBuilder.where("_id").equals(this.id));
-                    Find findById = builder.build();
-                    Document document = masterSlaveCollection.findOne(findById);
+                    Document document = masterSlaveCollection.findOne(QueryBuilder.where("_id").equals(this.id));
+                    String documentId = null;
+
                     if (document == null) {
                         DocumentBuilder documentbuilder = new DocumentBuilderImpl();
                         documentbuilder.add("_id", this.id);
                         documentbuilder.add("instanceId", instanceId);
                         documentbuilder.add("timestamp", 0);
-
+                        document = documentbuilder.build();
                         masterSlaveCollection.insert(documentbuilder);
                     } else {
+                        LOGGER.trace("document in DB: {}", document);
+                        documentId = document.get("_id").getValueAsString();
                         DocumentBuilder documentbuilder = new DocumentBuilderImpl(document);
                         documentbuilder.remove("instanceId");
                         documentbuilder.add("instanceId", instanceId);
@@ -67,21 +79,29 @@ public class MasterSlaveRunnable implements Runnable {
                         document = documentbuilder.build();
                     }
 
-                    ConditionBuilder timeQuery = null;//QueryBuilder.where("timestamp").lessThanOrEqualTo(timestamp - ConfigurationUtil.getMasterSlaveLeaseTime(name) * 1000);
+                    ConditionBuilder timeQuery = QueryBuilder.where("timestamp").lessThanOrEqualTo(timestamp - masterSlaveLeaseTime * 1000);
                     Document updateLeaseQuery = QueryBuilder.and(QueryBuilder.where("_id").equals(this.id), timeQuery);
 
-                    long numOfRowsUpdated = masterSlaveCollection.update(updateLeaseQuery, document);
+                    LOGGER.trace("id: {}, timestamp: {}, lease-time: {}, updateQuery: {}", id, timestamp, masterSlaveLeaseTime, updateLeaseQuery);
+                    long numOfRowsUpdated = masterSlaveCollection.update(updateLeaseQuery, document,false, true);
 
+                    LOGGER.trace("document id: {}, my id: {}", documentId, id);
                     if (numOfRowsUpdated > 0) {
-                        LOGGER.info("{} is now master", this.id);
-                        masterSlaveListener.goMaster();
+                        Boolean isFirstTime = MasterSlaveRegistry.INSTANCE.firstTimeIndicator.get(name);
+                        if (!id.equals(documentId) || isFirstTime.booleanValue()) {
+                            LOGGER.info("{} is now master", this.id);
+                            MasterSlaveRegistry.INSTANCE.firstTimeIndicator.put(name, Boolean.FALSE);
+                            masterSlaveListener.goMaster();
+                        }
                     } else {
-                        LOGGER.info("{} is now slave", this.id);
-                        masterSlaveListener.goSlave();
+                        if (documentId == null || id.equals(documentId)) {
+                            LOGGER.info("{} is now slave", this.id);
+                            masterSlaveListener.goSlave();
+                        }
                     }
                 }
 
-//                    TimeUnit.MILLISECONDS.sleep(ConfigurationUtil.getMasterSlaveLeaseTime(name)*1000-200);
+                TimeUnit.MILLISECONDS.sleep(masterSlaveLeaseTime * 1000);
 
             } catch (Exception e) {
                 LOGGER.error("problem running maser slave thread for: {}. error is: {}", name, e, e);

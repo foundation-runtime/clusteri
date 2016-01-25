@@ -1,5 +1,10 @@
 package com.cisco.oss.foundation.cluster.registry;
 
+import com.allanbank.mongodb.MongoCollection;
+import com.allanbank.mongodb.bson.Document;
+import com.allanbank.mongodb.builder.QueryBuilder;
+import com.cisco.oss.foundation.cluster.mongo.MongoClient;
+import com.cisco.oss.foundation.cluster.utils.ConfigurationUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -17,6 +22,7 @@ public enum MasterSlaveRegistry {
 
     private ConcurrentMap<String, MasterSlaveListener> listeners = new ConcurrentHashMap<>();
     public ConcurrentMap<String, Boolean> threadController = new ConcurrentHashMap<>();
+    public ConcurrentMap<String, Boolean> firstTimeIndicator = new ConcurrentHashMap<>();
 
     public void addMasterSlaveListener(String name, MasterSlaveListener masterSlaveListener) {
         MasterSlaveListener existingListener = listeners.putIfAbsent(name, masterSlaveListener);
@@ -30,12 +36,31 @@ public enum MasterSlaveRegistry {
         masterSlaveThread.setDaemon(true);
         masterSlaveThread.start();
         threadController.put(name, Boolean.TRUE);
+        firstTimeIndicator.put(name, Boolean.TRUE);
+
         masterSlaveThread.setUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
             @Override
             public void uncaughtException(Thread t, Throwable e) {
                 LOGGER.error("Error running master slave thread for: {}. error is: {}", name, e, e);
             }
         });
+
+        //cleanup so we don't keep zombie masteres registered
+        Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
+            @Override
+            public void run() {
+                //TODO do we need this or is the firstTime indicator enough?
+                cleanupDB();
+            }
+        }));
+    }
+
+    private void cleanupDB() {
+        MongoCollection masterSlaveCollection = MongoClient.INSTANCE.getMasterSlaveCollection();
+        Document document = masterSlaveCollection.findOne(QueryBuilder.where("instanceId").equals(ConfigurationUtil.INSTANCE_ID));
+        if (document != null){
+            masterSlaveCollection.delete(document);
+        }
     }
 
     public boolean removeMasterSlaveListener(String name) {
