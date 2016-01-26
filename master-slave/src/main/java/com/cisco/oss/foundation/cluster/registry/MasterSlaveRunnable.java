@@ -57,7 +57,7 @@ public class MasterSlaveRunnable implements Runnable {
                 boolean isActiveDC = isActiveDC();
 
                 int masterSlaveLeaseTime = ConfigurationUtil.getMasterSlaveLeaseTime(name);
-                if (isActiveDC) {
+                if (isActiveDC && MongoClient.INSTANCE.IS_DB_UP.get()) {
 
                     long timestamp = System.currentTimeMillis();
 
