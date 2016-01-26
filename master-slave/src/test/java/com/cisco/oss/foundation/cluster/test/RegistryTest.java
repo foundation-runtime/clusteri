@@ -143,6 +143,7 @@ public class RegistryTest {
 
         Set<Thread> threadSet = Thread.getAllStackTraces().keySet();
         Assert.assertTrue(threadSet.stream().filter(thread -> thread.getName().contains("test1")).count() == 1);
+        Assert.assertTrue(threadSet.stream().filter(thread -> thread.getName().contains("test2")).count() == 1);
 
 
         MasterSlaveRegistry.INSTANCE.addMasterSlaveListener("test1", new MasterSlaveListener() {
@@ -201,13 +202,13 @@ public class RegistryTest {
 
         MasterSlaveRegistry.INSTANCE.removeMasterSlaveListener("test1");
 
-        System.gc();
-
         try {
             TimeUnit.SECONDS.sleep(5);
         } catch (InterruptedException e) {
             LOGGER.debug("interrupted");
         }
+
+        System.gc();
 
         threadSet = Thread.getAllStackTraces().keySet();
         Assert.assertTrue(threadSet.stream().filter(thread -> thread.getName().contains("test1")).count() == 0);

@@ -26,6 +26,8 @@ public class MasterSlaveRunnable implements Runnable {
     private String id = null;
     private final String instanceId = ConfigurationUtil.INSTANCE_ID;
     private MongoClient mongoClient = MongoClient.INSTANCE;
+    static final ThreadLocal<Boolean> masterFirstTime = new ThreadLocal<>();
+    static final ThreadLocal<Boolean> slaveFirstTime = new ThreadLocal<>();
 
     public MasterSlaveRunnable(String name, MasterSlaveListener masterSlaveListener) {
         this.name = name;
@@ -35,6 +37,9 @@ public class MasterSlaveRunnable implements Runnable {
 
     @Override
     public void run() {
+
+        masterFirstTime.set(Boolean.TRUE);
+        slaveFirstTime.set(Boolean.TRUE);
 
         //sleep a bit until the async load and connection to DB is finished.
         try {
@@ -59,7 +64,7 @@ public class MasterSlaveRunnable implements Runnable {
 
                     MongoCollection masterSlaveCollection = mongoClient.getMasterSlaveCollection();
                     Document document = masterSlaveCollection.findOne(QueryBuilder.where("_id").equals(this.id));
-                    String documentId = null;
+                    String documentInstanceId = null;
 
                     if (document == null) {
                         DocumentBuilder documentbuilder = new DocumentBuilderImpl();
@@ -70,7 +75,7 @@ public class MasterSlaveRunnable implements Runnable {
                         masterSlaveCollection.insert(documentbuilder);
                     } else {
                         LOGGER.trace("document in DB: {}", document);
-                        documentId = document.get("_id").getValueAsString();
+                        documentInstanceId = document.get("instanceId").getValueAsString();
                         DocumentBuilder documentbuilder = new DocumentBuilderImpl(document);
                         documentbuilder.remove("instanceId");
                         documentbuilder.add("instanceId", instanceId);
@@ -79,23 +84,26 @@ public class MasterSlaveRunnable implements Runnable {
                         document = documentbuilder.build();
                     }
 
-                    ConditionBuilder timeQuery = QueryBuilder.where("timestamp").lessThanOrEqualTo(timestamp - masterSlaveLeaseTime * 1000);
+                    long lastExpectedLeaseUpdateTime = timestamp - masterSlaveLeaseTime * 1000;
+                    ConditionBuilder timeQuery = QueryBuilder.where("timestamp").lessThanOrEqualTo(lastExpectedLeaseUpdateTime);
                     Document updateLeaseQuery = QueryBuilder.and(QueryBuilder.where("_id").equals(this.id), timeQuery);
 
-                    LOGGER.trace("id: {}, timestamp: {}, lease-time: {}, updateQuery: {}", id, timestamp, masterSlaveLeaseTime, updateLeaseQuery);
-                    long numOfRowsUpdated = masterSlaveCollection.update(updateLeaseQuery, document,false, true);
+                    LOGGER.trace("id: {}, timestamp: {}, lease-time: {}, lastExpectedLeaseUpdateTime: {}", id, timestamp, masterSlaveLeaseTime, lastExpectedLeaseUpdateTime);
+//                    long numOfRowsUpdated = masterSlaveCollection.update(updateLeaseQuery, document,false, true);
+                    long numOfRowsUpdated = masterSlaveCollection.update(updateLeaseQuery, document);
 
-                    LOGGER.trace("document id: {}, my id: {}", documentId, id);
+                    LOGGER.trace("document instance-id: {}, my instance-id: {}", documentInstanceId, instanceId);
                     if (numOfRowsUpdated > 0) {
-                        Boolean isFirstTime = MasterSlaveRegistry.INSTANCE.firstTimeIndicator.get(name);
-                        if (!id.equals(documentId) || isFirstTime.booleanValue()) {
+
+                        if (!instanceId.equals(documentInstanceId) || masterFirstTime.get().booleanValue()) {
                             LOGGER.info("{} is now master", this.id);
-                            MasterSlaveRegistry.INSTANCE.firstTimeIndicator.put(name, Boolean.FALSE);
+                            masterFirstTime.set(Boolean.FALSE);
                             masterSlaveListener.goMaster();
                         }
                     } else {
-                        if (documentId == null || id.equals(documentId)) {
+                        if (!instanceId.equals(documentInstanceId) || slaveFirstTime.get().booleanValue()) {
                             LOGGER.info("{} is now slave", this.id);
+                            slaveFirstTime.set(Boolean.FALSE);
                             masterSlaveListener.goSlave();
                         }
                     }
