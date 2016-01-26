@@ -14,6 +14,7 @@ import com.allanbank.mongodb.MongoFactory;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Created by igreenfi on 9/21/2015.
@@ -25,7 +26,11 @@ public enum MongoClient {
 	private Logger logger = null;
 	private static final String DATA_CENTER_COLLECTION = "dataCenter";
 
+	private static final int DB_RETRY_DELAY = 10;
+
 	private static final String MASTER_SLAVE_COLLECTION = "masterSlave";
+
+	public AtomicBoolean IS_DB_UP = new AtomicBoolean(false);
 
 	MongoDatabase database;
 	MongoCollection dataCenter;
@@ -35,8 +40,12 @@ public enum MongoClient {
     MongoClient() {
 
 		logger = LoggerFactory.getLogger(MongoClient.class);
-    	
-    	database = connect();
+
+		try {
+			database = connect();
+		} catch (Exception e) {
+			infiniteConnect();
+		}
 
 		dataCenter	= database.getCollection(DATA_CENTER_COLLECTION);
 		masterSlave		= database.getCollection(MASTER_SLAVE_COLLECTION);
@@ -80,14 +89,36 @@ public enum MongoClient {
 			database.getCollection(DATA_CENTER_COLLECTION).count();
 		} catch (Exception e) { //will raise an error if authentication fails or if server is down
 			String message = "Can't connect to '" + dbName + "' mongoDB. Please check connection and configuration. MongoDB error message: " + e.toString();
-			logger.error(message, e);
+//			logger.error(message, e);
 			throw new RuntimeException(message);
 		}
     	
 		return database;
 	}
 
-    public MongoCollection getDataCenterCollection() {
+	private void infiniteConnect() {
+		new Thread(new Runnable() {
+			@Override
+			public void run() {
+				while(!IS_DB_UP.get()){
+					try {
+						connect();
+						IS_DB_UP.set(true);
+						logger.info("dc reconnect is successful");
+					} catch (Exception e) {
+						logger.warn("db reconnect failed. retrying in {} seconds. error: {}", DB_RETRY_DELAY, e);
+						try {
+							TimeUnit.SECONDS.sleep(DB_RETRY_DELAY);
+						} catch (InterruptedException e1) {
+							//ignore
+						}
+					}
+				}
+			}
+		},"Infinite-Reconnect").start();
+	}
+
+	public MongoCollection getDataCenterCollection() {
         return dataCenter;
     }
     

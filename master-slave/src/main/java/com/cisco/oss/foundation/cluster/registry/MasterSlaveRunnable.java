@@ -1,6 +1,7 @@
 package com.cisco.oss.foundation.cluster.registry;
 
 import com.allanbank.mongodb.MongoCollection;
+import com.allanbank.mongodb.MongoDbException;
 import com.allanbank.mongodb.bson.Document;
 import com.allanbank.mongodb.bson.builder.DocumentBuilder;
 import com.allanbank.mongodb.bson.builder.impl.DocumentBuilderImpl;
@@ -57,7 +58,7 @@ public class MasterSlaveRunnable implements Runnable {
                 boolean isActiveDC = isActiveDC();
 
                 int masterSlaveLeaseTime = ConfigurationUtil.getMasterSlaveLeaseTime(name);
-                if (isActiveDC) {
+                if (isActiveDC && MongoClient.INSTANCE.IS_DB_UP.get()) {
 
                     long timestamp = System.currentTimeMillis();
 
@@ -125,11 +126,17 @@ public class MasterSlaveRunnable implements Runnable {
         if (StringUtils.isBlank(currentDC)) {
             return true;
         } else {
-            //TODO do we want to prevent having multiple datacenter documents in this collection
-            MongoCollection dataCenterCollection = MongoClient.INSTANCE.getDataCenterCollection();
-            ConditionBuilder datacenterQuery = QueryBuilder.where("datacenter").equals(currentDC);
-            Document document = dataCenterCollection.findOne(datacenterQuery);
-            return document != null;
+            try {
+                //TODO do we want to prevent having multiple datacenter documents in this collection
+                MongoCollection dataCenterCollection = MongoClient.INSTANCE.getDataCenterCollection();
+                ConditionBuilder datacenterQuery = QueryBuilder.where("datacenter").equals(currentDC);
+                Document document = dataCenterCollection.findOne(datacenterQuery);
+                return document != null;
+            } catch (Exception e) {
+                //if this fails  for any reason we treat this as a non DC supported environment.
+                LOGGER.error("problem reading datacenter collection - assuming in active DC");
+                return true;
+            }
         }
     }
 
