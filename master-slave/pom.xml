@@ -94,6 +94,80 @@
             </plugins>
         </pluginManagement>
         <plugins>
+            <plugin>
+                <groupId>com.github.joelittlejohn.embedmongo</groupId>
+                <artifactId>embedmongo-maven-plugin</artifactId>
+                <version>0.3.4</version>
+                <executions>
+                    <execution>
+                        <id>start</id>
+                        <goals>
+                            <goal>start</goal>
+                        </goals>
+                        <phase>process-test-classes</phase>
+                        <configuration>
+                            <!--<port>37017</port>-->
+                            <!-- optional, default 27017 -->
+
+                            <!--<randomPort>true</randomPort>-->
+                            <!-- optional, default is false, if true allocates a random port and overrides embedmongo.port -->
+
+                            <!--<version>2.0.4</version>-->
+                            <!-- optional, default 2.2.1 -->
+
+                            <!--<databaseDirectory>/tmp/mongotest</databaseDirectory>-->
+                            <!-- optional, default is a new dir in java.io.tmpdir -->
+
+                            <!--<logging>file</logging>-->
+                            <!-- optional (file|console|none), default console -->
+
+                            ?
+                            <!-- optional, can be used when logging=file, default is ./embedmongo.log -->
+
+                            <!--<logFileEncoding>utf-8</logFileEncoding>-->
+                            <!-- optional, can be used when logging=file, default is utf-8 -->
+
+                            <!--<bindIp>127.0.0.1</bindIp>-->
+                            <!-- optional, default is to listen on all interfaces -->
+
+                            <!--<downloadPath>http://internal-mongo-repo/</downloadPath>-->
+                            <!-- optional, default is http://fastdl.mongodb.org/ -->
+
+                            <!--<storageEngine>wiredTiger</storageEngine>-->
+                            <!--optional, one of wiredTiger or mmapv1 (default is mmapv1) -->
+
+                            <!--<skip>false</skip>-->
+                            <!-- optional, skips this plugin entirely, use on the command line like -Dembedmongo.skip -->
+
+                        </configuration>
+                    </execution>
+                    <!--<execution>
+                        <id>mongo-import</id>
+                        <goals>
+                            <goal>mongo-import</goal>
+                        </goals>
+                        <configuration>
+                            &lt;!&ndash;<version>2.0.4</version>&ndash;&gt;
+                            &lt;!&ndash; optional, default 2.2.1 &ndash;&gt;
+
+                            &lt;!&ndash;<defaultImportDatabase>test</defaultImportDatabase>&ndash;&gt;
+                            &lt;!&ndash; optional, name of the default database to import data &ndash;&gt;
+
+                            &lt;!&ndash;<parallel>false</parallel>&ndash;&gt;
+                            &lt;!&ndash; optional, default false, if true it launches in parallel all imports &ndash;&gt;
+
+                            &lt;!&ndash;<wait>false</wait>&ndash;&gt;
+                            &lt;!&ndash; optional, default false, if true it will wait forever after it imports the data &ndash;&gt;
+                        </configuration>
+                    </execution>-->
+                    <execution>
+                        <id>stop</id>
+                        <goals>
+                            <goal>stop</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
     <dependencies>        
@@ -128,6 +202,11 @@
             <groupId>com.allanbank</groupId>
             <artifactId>mongodb-async-driver</artifactId>
             <version>2.0.1</version>
+        </dependency>
+        <dependency>
+            <groupId>de.flapdoodle.embed</groupId>
+            <artifactId>de.flapdoodle.embed.mongo</artifactId>
+            <version>1.50.2</version>
         </dependency>
     </dependencies>
     <repositories>

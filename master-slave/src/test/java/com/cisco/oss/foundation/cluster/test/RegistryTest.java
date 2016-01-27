@@ -1,5 +1,6 @@
 package com.cisco.oss.foundation.cluster.test;
 
+import com.allanbank.mongodb.bson.impl.EmptyDocument;
 import com.cisco.oss.foundation.cluster.mongo.MongoClient;
 import com.cisco.oss.foundation.cluster.registry.MasterSlaveListener;
 import com.cisco.oss.foundation.cluster.registry.MasterSlaveRegistry;
@@ -90,7 +91,7 @@ public class RegistryTest {
         } catch (InterruptedException e) {
             Assert.fail(e.toString());
         }
-        MongoClient.INSTANCE.getMasterSlaveCollection().drop();
+        MongoClient.INSTANCE.getMasterSlaveCollection().delete(EmptyDocument.INSTANCE);
         System.gc();
 
     }

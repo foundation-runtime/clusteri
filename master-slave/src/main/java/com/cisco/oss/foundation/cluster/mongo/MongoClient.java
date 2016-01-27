@@ -87,6 +87,7 @@ public enum MongoClient {
 		//Check Authentication
 		try {
 			database.getCollection(DATA_CENTER_COLLECTION).count();
+			IS_DB_UP.set(true);
 		} catch (Exception e) { //will raise an error if authentication fails or if server is down
 			String message = "Can't connect to '" + dbName + "' mongoDB. Please check connection and configuration. MongoDB error message: " + e.toString();
 //			logger.error(message, e);
