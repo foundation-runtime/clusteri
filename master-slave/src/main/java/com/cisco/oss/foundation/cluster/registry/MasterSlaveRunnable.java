@@ -1,12 +1,10 @@
 package com.cisco.oss.foundation.cluster.registry;
 
 import com.allanbank.mongodb.MongoCollection;
-import com.allanbank.mongodb.MongoDbException;
 import com.allanbank.mongodb.bson.Document;
 import com.allanbank.mongodb.bson.builder.DocumentBuilder;
 import com.allanbank.mongodb.bson.builder.impl.DocumentBuilderImpl;
 import com.allanbank.mongodb.builder.ConditionBuilder;
-import com.allanbank.mongodb.builder.Find;
 import com.allanbank.mongodb.builder.QueryBuilder;
 import com.cisco.oss.foundation.cluster.mongo.MongoClient;
 import com.cisco.oss.foundation.cluster.utils.ConfigurationUtil;
@@ -15,7 +13,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Created by Yair Ogen (yaogen) on 24/01/2016.
@@ -27,8 +24,8 @@ public class MasterSlaveRunnable implements Runnable {
     private String id = null;
     private final String instanceId = ConfigurationUtil.INSTANCE_ID;
     private MongoClient mongoClient = MongoClient.INSTANCE;
-    static final ThreadLocal<Boolean> masterFirstTime = new ThreadLocal<>();
-    static final ThreadLocal<Boolean> slaveFirstTime = new ThreadLocal<>();
+    static final ThreadLocal<Boolean> masterNextTimeInvoke = new ThreadLocal<>();
+    static final ThreadLocal<Boolean> slaveNextTimeInvoke = new ThreadLocal<>();
 
     public MasterSlaveRunnable(String name, MasterSlaveListener masterSlaveListener) {
         this.name = name;
@@ -39,8 +36,8 @@ public class MasterSlaveRunnable implements Runnable {
     @Override
     public void run() {
 
-        masterFirstTime.set(Boolean.TRUE);
-        slaveFirstTime.set(Boolean.TRUE);
+        masterNextTimeInvoke.set(Boolean.TRUE);
+        slaveNextTimeInvoke.set(Boolean.TRUE);
 
         //sleep a bit until the async load and connection to DB is finished.
         try {
@@ -95,16 +92,17 @@ public class MasterSlaveRunnable implements Runnable {
 
                     LOGGER.trace("document instance-id: {}, my instance-id: {}", documentInstanceId, instanceId);
                     if (numOfRowsUpdated > 0) {
-
-                        if (!instanceId.equals(documentInstanceId) || masterFirstTime.get().booleanValue()) {
+                        if (masterNextTimeInvoke.get().booleanValue()) {
                             LOGGER.info("{} is now master", this.id);
-                            masterFirstTime.set(Boolean.FALSE);
+                            masterNextTimeInvoke.set(Boolean.FALSE);
+                            slaveNextTimeInvoke.set(Boolean.TRUE);
                             masterSlaveListener.goMaster();
                         }
                     } else {
-                        if (!instanceId.equals(documentInstanceId) || slaveFirstTime.get().booleanValue()) {
+                        if (slaveNextTimeInvoke.get().booleanValue()) {
                             LOGGER.info("{} is now slave", this.id);
-                            slaveFirstTime.set(Boolean.FALSE);
+                            slaveNextTimeInvoke.set(Boolean.FALSE);
+                            masterNextTimeInvoke.set(Boolean.TRUE);
                             masterSlaveListener.goSlave();
                         }
                     }
