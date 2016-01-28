@@ -3,7 +3,7 @@ package com.cisco.oss.foundation.cluster.registry;
 import com.allanbank.mongodb.MongoCollection;
 import com.allanbank.mongodb.builder.QueryBuilder;
 import com.cisco.oss.foundation.cluster.mongo.MongoClient;
-import com.cisco.oss.foundation.cluster.utils.ConfigurationUtil;
+import com.cisco.oss.foundation.cluster.utils.MasterSlaveConfigurationUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,7 +55,7 @@ public enum MasterSlaveRegistry {
 
     private void cleanupDB() {
         MongoCollection masterSlaveCollection = MongoClient.INSTANCE.getMasterSlaveCollection();
-        masterSlaveCollection.delete(QueryBuilder.where("instanceId").equals(ConfigurationUtil.INSTANCE_ID));
+        masterSlaveCollection.delete(QueryBuilder.where("instanceId").equals(MasterSlaveConfigurationUtil.INSTANCE_ID));
     }
 
     public boolean removeMasterSlaveListener(String name) {

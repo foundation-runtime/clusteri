@@ -1,9 +1,9 @@
 package com.cisco.oss.foundation.cluster.mongo;
 
-import com.cisco.oss.foundation.cluster.utils.ConfigurationUtil;
+import com.cisco.oss.foundation.cluster.utils.MasterSlaveConfigurationUtil;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Component;
 
 import com.allanbank.mongodb.Credential.Builder;
 import com.allanbank.mongodb.MongoClientConfiguration;
@@ -11,8 +11,6 @@ import com.allanbank.mongodb.MongoCollection;
 import com.allanbank.mongodb.MongoDatabase;
 import com.allanbank.mongodb.MongoFactory;
 
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -37,6 +35,10 @@ public enum MongoClient {
 
     MongoCollection masterSlave;
 
+	String mongoUserName = "";
+	String mongoPassword = "";
+	boolean isAuthenticationEnabled = false;
+
     MongoClient() {
 
 		logger = LoggerFactory.getLogger(MongoClient.class);
@@ -51,29 +53,33 @@ public enum MongoClient {
 		masterSlave		= database.getCollection(MASTER_SLAVE_COLLECTION);
 	}
 
+	public void enableAuthentication(String user, String password){
+
+		if(StringUtils.isBlank(user)){
+			throw new IllegalArgumentException("mongo user can't be null or empty");
+		}
+
+		if(StringUtils.isBlank(password)){
+			throw new IllegalArgumentException("mongo password can't be null or empty");
+		}
+
+		isAuthenticationEnabled = true;
+		mongoUserName = user;
+		mongoPassword = password;
+	}
+
 	private MongoDatabase connect(){
 		MongoClientConfiguration config = new MongoClientConfiguration();
-    	config.addServer(ConfigurationUtil.getMongodbHost() + ":" + ConfigurationUtil.getMongodbPort());
+    	config.addServer(MasterSlaveConfigurationUtil.getMongodbHost() + ":" + MasterSlaveConfigurationUtil.getMongodbPort());
     	config.setMaxConnectionCount(10);
 
-    	String dbName = ConfigurationUtil.getMongodbName();
-    	Boolean isAuthenticationEnabled = ConfigurationUtil.getIsMongodbAuthenticationEnabled();
+    	String dbName = MasterSlaveConfigurationUtil.getMongodbName();
     	
 		if (isAuthenticationEnabled) {
-			final boolean encryptionEnabled = ConfigurationUtil.getIsMongodbEncryptedPassword().equals("true");
-
-			final String userName = ConfigurationUtil.getMongodbUserName();
-
-			if(encryptionEnabled){
-				throw new UnsupportedOperationException("pwd encryption not supported");
-			}
-
-			final String password = ConfigurationUtil.getMongodbPassword() ;
-
 
 			Builder credentials = new Builder();
-			credentials.userName(userName);
-			credentials.password(password.toCharArray());
+			credentials.userName(mongoUserName);
+			credentials.password(mongoPassword.toCharArray());
 			credentials.setDatabase(dbName);
 			
 			config.addCredential(credentials);

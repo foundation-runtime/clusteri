@@ -5,7 +5,7 @@ import org.apache.commons.configuration.Configuration;
 
 import com.cisco.oss.foundation.configuration.ConfigurationFactory;
 
-public class ConfigurationUtil {
+public class MasterSlaveConfigurationUtil {
 
     public static final String INSTANCE_ID = getUniqueProcessName();
     public static final String COMPONENT_NAME = getComponentName();
@@ -27,28 +27,8 @@ public class ConfigurationUtil {
         return configuration.getString("service.mongo.db.name", "cluster-db");
     }
 
-    public static int getMongoBatchSize() {
-        return configuration.getInt("service.mongo.batchSize");
-    }
-
-    public static Boolean getIsMongodbAuthenticationEnabled() {
-        return configuration.getBoolean("service.mongo.authenticationEnabled",false);
-    }
-
-    public static Boolean getIsMongodbEncryptedPassword() {
-        return configuration.getBoolean("service.mongo.isPasswordEncrypted", false);
-    }
-
     public static int getMasterSlaveLeaseTime(String name) {
         return configuration.getInt(name + ".masterSlave.leaseTime", 30);
-    }
-
-    public static String getMongodbUserName() {
-        return configuration.getString("service.mongo.userName");
-    }
-
-    public static String getMongodbPassword() {
-        return configuration.getString("service.mongo.userPassword");
     }
 
     public static String getUniqueProcessName() {

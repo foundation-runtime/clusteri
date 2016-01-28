@@ -7,7 +7,7 @@ import com.allanbank.mongodb.bson.builder.impl.DocumentBuilderImpl;
 import com.allanbank.mongodb.builder.ConditionBuilder;
 import com.allanbank.mongodb.builder.QueryBuilder;
 import com.cisco.oss.foundation.cluster.mongo.MongoClient;
-import com.cisco.oss.foundation.cluster.utils.ConfigurationUtil;
+import com.cisco.oss.foundation.cluster.utils.MasterSlaveConfigurationUtil;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,7 +22,7 @@ public class MasterSlaveRunnable implements Runnable {
     private String name;
     private MasterSlaveListener masterSlaveListener;
     private String id = null;
-    private final String instanceId = ConfigurationUtil.INSTANCE_ID;
+    private final String instanceId = MasterSlaveConfigurationUtil.INSTANCE_ID;
     private MongoClient mongoClient = MongoClient.INSTANCE;
     static final ThreadLocal<Boolean> masterNextTimeInvoke = new ThreadLocal<>();
     static final ThreadLocal<Boolean> slaveNextTimeInvoke = new ThreadLocal<>();
@@ -30,7 +30,7 @@ public class MasterSlaveRunnable implements Runnable {
     public MasterSlaveRunnable(String name, MasterSlaveListener masterSlaveListener) {
         this.name = name;
         this.masterSlaveListener = masterSlaveListener;
-        this.id = ConfigurationUtil.COMPONENT_NAME + "-" + name;
+        this.id = MasterSlaveConfigurationUtil.COMPONENT_NAME + "-" + name;
     }
 
     @Override
@@ -54,7 +54,7 @@ public class MasterSlaveRunnable implements Runnable {
 
                 boolean isActiveDC = isActiveDC();
 
-                int masterSlaveLeaseTime = ConfigurationUtil.getMasterSlaveLeaseTime(name);
+                int masterSlaveLeaseTime = MasterSlaveConfigurationUtil.getMasterSlaveLeaseTime(name);
                 if (isActiveDC && MongoClient.INSTANCE.IS_DB_UP.get()) {
 
                     long timestamp = System.currentTimeMillis();
@@ -120,7 +120,7 @@ public class MasterSlaveRunnable implements Runnable {
     }
 
     private boolean isActiveDC() {
-        String currentDC = ConfigurationUtil.ACTIVE_DATA_CENTER;
+        String currentDC = MasterSlaveConfigurationUtil.ACTIVE_DATA_CENTER;
         if (StringUtils.isBlank(currentDC)) {
             return true;
         } else {
