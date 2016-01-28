@@ -50,11 +50,12 @@ public class MasterSlaveRunnable implements Runnable {
 
         while (runThread) {
 
+            int masterSlaveLeaseTime = MasterSlaveConfigurationUtil.getMasterSlaveLeaseTime(name);
+
             try {
 
                 boolean isActiveDC = isActiveDC();
 
-                int masterSlaveLeaseTime = MasterSlaveConfigurationUtil.getMasterSlaveLeaseTime(name);
                 if (isActiveDC && MongoClient.INSTANCE.IS_DB_UP.get()) {
 
                     long timestamp = System.currentTimeMillis();
@@ -93,14 +94,14 @@ public class MasterSlaveRunnable implements Runnable {
                     LOGGER.trace("document instance-id: {}, my instance-id: {}", documentInstanceId, instanceId);
                     if (numOfRowsUpdated > 0) {
                         if (masterNextTimeInvoke.get().booleanValue()) {
-                            LOGGER.info("{} is now master", this.id);
+                            LOGGER.info("{} is now master", this.instanceId);
                             masterNextTimeInvoke.set(Boolean.FALSE);
                             slaveNextTimeInvoke.set(Boolean.TRUE);
                             masterSlaveListener.goMaster();
                         }
                     } else {
                         if (slaveNextTimeInvoke.get().booleanValue()) {
-                            LOGGER.info("{} is now slave", this.id);
+                            LOGGER.info("{} is now slave", this.instanceId);
                             slaveNextTimeInvoke.set(Boolean.FALSE);
                             masterNextTimeInvoke.set(Boolean.TRUE);
                             masterSlaveListener.goSlave();
@@ -108,11 +109,14 @@ public class MasterSlaveRunnable implements Runnable {
                     }
                 }
 
-                TimeUnit.MILLISECONDS.sleep(masterSlaveLeaseTime * 1000);
-
             } catch (Exception e) {
                 LOGGER.error("problem running maser slave thread for: {}. error is: {}", name, e, e);
             } finally {
+                try {
+                    TimeUnit.MILLISECONDS.sleep(masterSlaveLeaseTime * 1000);
+                } catch (InterruptedException e) {
+                    //ignore
+                }
                 runThread = MasterSlaveRegistry.INSTANCE.threadController.getOrDefault(name, Boolean.TRUE);
             }
 
