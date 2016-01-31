@@ -42,7 +42,7 @@ public class MasterSlaveConfigurationUtil {
 
 
     public static String getMongodbName() {
-        return configuration.getString("mongo.db.name", "cluster-db");
+        return configuration.getString("mongodb.db.name", "cluster-db");
     }
 
     public static int getMasterSlaveLeaseTime(String name) {
