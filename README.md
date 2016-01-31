@@ -1,4 +1,4 @@
-Clister repo contains libraries relevant to clustering applications.
+Cluster repo contains libraries relevant to clustering applications.
 
 These libraries interact with other libraries from the configuration, logging and common repositories.
 
