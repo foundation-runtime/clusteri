@@ -2,6 +2,7 @@ package com.cisco.oss.foundation.cluster.mongo;
 
 import com.cisco.oss.foundation.cluster.utils.MasterSlaveConfigurationUtil;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -11,6 +12,7 @@ import com.allanbank.mongodb.MongoCollection;
 import com.allanbank.mongodb.MongoDatabase;
 import com.allanbank.mongodb.MongoFactory;
 
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -70,7 +72,10 @@ public enum MongoClient {
 
 	private MongoDatabase connect(){
 		MongoClientConfiguration config = new MongoClientConfiguration();
-    	config.addServer(MasterSlaveConfigurationUtil.getMongodbHost() + ":" + MasterSlaveConfigurationUtil.getMongodbPort());
+		List<Pair<String, Integer>> mongodbServers = MasterSlaveConfigurationUtil.getMongodbServers();
+		for (Pair<String, Integer> mongodbServer : mongodbServers) {
+			config.addServer(mongodbServer.getLeft() + ":" + mongodbServer.getRight());
+		}
     	config.setMaxConnectionCount(10);
 
     	String dbName = MasterSlaveConfigurationUtil.getMongodbName();
