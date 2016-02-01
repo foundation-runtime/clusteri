@@ -22,6 +22,12 @@ import java.util.concurrent.TimeUnit;
  */
 public class MasterSlaveRunnable implements Runnable {
     private static final Logger LOGGER = LoggerFactory.getLogger(MasterSlaveRunnable.class);
+    public static final String ID = "_id";
+    public static final String MASTER_INSTANCE_ID = "masterInstanceId";
+    public static final String COMPONENT = "component";
+    public static final String JOB = "job";
+    public static final String LEASE_TAKEN = "leaseTaken";
+    public static final String ACTIVE_DATACENTER = "activeDatacenter";
     private String name;
     private MasterSlaveListener masterSlaveListener;
     private String id = null;
@@ -61,55 +67,53 @@ public class MasterSlaveRunnable implements Runnable {
 
                 if (isActiveDC && MongoClient.INSTANCE.IS_DB_UP.get()) {
 
-                    long timestamp = System.currentTimeMillis();
+                    long leaseTaken = System.currentTimeMillis();
 
 
                     MongoCollection masterSlaveCollection = mongoClient.getMasterSlaveCollection();
-                    Document document = masterSlaveCollection.findOne(QueryBuilder.where("_id").equals(this.id));
+                    Document document = masterSlaveCollection.findOne(QueryBuilder.where(ID).equals(this.id));
                     String documentInstanceId = null;
 
                     if (document == null) {
                         DocumentBuilder documentbuilder = new DocumentBuilderImpl();
-                        documentbuilder.add("_id", this.id);
-                        documentbuilder.add("instanceId", instanceId);
-                        documentbuilder.add("timestamp", 0);
+                        documentbuilder.add(ID, this.id);
+                        documentbuilder.add(MASTER_INSTANCE_ID, instanceId);
+                        documentbuilder.add(COMPONENT, MasterSlaveConfigurationUtil.COMPONENT_NAME);
+                        documentbuilder.add(JOB, name);
+                        documentbuilder.add(LEASE_TAKEN, 0);
                         document = documentbuilder.build();
                         masterSlaveCollection.insert(documentbuilder);
                     } else {
                         LOGGER.trace("document in DB: {}", document);
-                        documentInstanceId = document.get("instanceId").getValueAsString();
+                        documentInstanceId = document.get(MASTER_INSTANCE_ID).getValueAsString();
                         DocumentBuilder documentbuilder = new DocumentBuilderImpl(document);
-                        documentbuilder.remove("instanceId");
-                        documentbuilder.add("instanceId", instanceId);
-                        documentbuilder.remove("timestamp");
-                        documentbuilder.add("timestamp", timestamp);
+                        documentbuilder.remove(MASTER_INSTANCE_ID);
+                        documentbuilder.add(MASTER_INSTANCE_ID, instanceId);
+                        documentbuilder.remove(LEASE_TAKEN);
+                        documentbuilder.add(LEASE_TAKEN, leaseTaken);
                         document = documentbuilder.build();
                     }
 
-                    long lastExpectedLeaseUpdateTime = timestamp - masterSlaveLeaseTime * 1000;
-                    ConditionBuilder timeQuery = QueryBuilder.where("timestamp").lessThanOrEqualTo(lastExpectedLeaseUpdateTime);
-                    Document updateLeaseQuery = QueryBuilder.and(QueryBuilder.where("_id").equals(this.id), timeQuery);
+                    long lastExpectedLeaseUpdateTime = leaseTaken - masterSlaveLeaseTime * 1000;
+                    ConditionBuilder timeQuery = QueryBuilder.where(LEASE_TAKEN).lessThanOrEqualTo(lastExpectedLeaseUpdateTime);
+                    Document updateLeaseQuery = QueryBuilder.and(QueryBuilder.where(ID).equals(this.id), timeQuery);
 
-                    LOGGER.trace("id: {}, timestamp: {}, lease-time: {}, lastExpectedLeaseUpdateTime: {}", id, timestamp, masterSlaveLeaseTime, lastExpectedLeaseUpdateTime);
+                    LOGGER.trace("id: {}, leaseTaken: {}, lease-time: {}, lastExpectedLeaseUpdateTime: {}", id, leaseTaken, masterSlaveLeaseTime, lastExpectedLeaseUpdateTime);
 //                    long numOfRowsUpdated = masterSlaveCollection.update(updateLeaseQuery, document,false, true);
                     long numOfRowsUpdated = masterSlaveCollection.update(updateLeaseQuery, document);
 
                     LOGGER.trace("document instance-id: {}, my instance-id: {}", documentInstanceId, instanceId);
                     if (numOfRowsUpdated > 0) {
-                        if (masterNextTimeInvoke.get().booleanValue()) {
-                            LOGGER.info("{} is now master", this.instanceId);
-                            masterNextTimeInvoke.set(Boolean.FALSE);
-                            slaveNextTimeInvoke.set(Boolean.TRUE);
-                            masterSlaveListener.goMaster();
+                        if (masterNextTimeInvoke.get()) {
+                            goMaster();
                         }
                     } else {
-                        if (slaveNextTimeInvoke.get().booleanValue()) {
-                            LOGGER.info("{} is now slave", this.instanceId);
-                            slaveNextTimeInvoke.set(Boolean.FALSE);
-                            masterNextTimeInvoke.set(Boolean.TRUE);
-                            masterSlaveListener.goSlave();
+                        if (slaveNextTimeInvoke.get()) {
+                            goSlave();
                         }
                     }
+                } else if(!isActiveDC && slaveNextTimeInvoke.get()){
+                    goSlave();
                 }
 
             } catch (Exception e) {
@@ -126,6 +130,20 @@ public class MasterSlaveRunnable implements Runnable {
         }
     }
 
+    public void goMaster() {
+        LOGGER.info("{} is now master", this.instanceId);
+        masterNextTimeInvoke.set(Boolean.FALSE);
+        slaveNextTimeInvoke.set(Boolean.TRUE);
+        masterSlaveListener.goMaster();
+    }
+
+    public void goSlave() {
+        LOGGER.info("{} is now slave", this.instanceId);
+        slaveNextTimeInvoke.set(Boolean.FALSE);
+        masterNextTimeInvoke.set(Boolean.TRUE);
+        masterSlaveListener.goSlave();
+    }
+
     private boolean isActiveDC() {
         String currentDC = MasterSlaveConfigurationUtil.ACTIVE_DATA_CENTER;
         if (StringUtils.isBlank(currentDC)) {
@@ -134,7 +152,7 @@ public class MasterSlaveRunnable implements Runnable {
             try {
                 //TODO do we want to prevent having multiple datacenter documents in this collection
                 MongoCollection dataCenterCollection = MongoClient.INSTANCE.getDataCenterCollection();
-                ConditionBuilder datacenterQuery = QueryBuilder.where("datacenter").equals(currentDC);
+                ConditionBuilder datacenterQuery = QueryBuilder.where(ACTIVE_DATACENTER).equals(currentDC);
                 Document document = dataCenterCollection.findOne(datacenterQuery);
                 return document != null;
             } catch (Exception e) {
