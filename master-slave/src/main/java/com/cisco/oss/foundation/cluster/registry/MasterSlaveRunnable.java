@@ -15,6 +15,9 @@ import org.slf4j.LoggerFactory;
 import java.util.concurrent.TimeUnit;
 
 /**
+ * Runnable to do all the logic of acquiring mastership.
+ * There will be an insatance per logical name invoked by #MasterSlaveRegistry.addMasterSlaveListener
+ * The runnable will query mongo and try to acquire a lock based on the componet-name, the logical name and the timestamp
  * Created by Yair Ogen (yaogen) on 24/01/2016.
  */
 public class MasterSlaveRunnable implements Runnable {

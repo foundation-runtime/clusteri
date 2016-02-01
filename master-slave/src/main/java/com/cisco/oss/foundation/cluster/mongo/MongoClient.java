@@ -17,7 +17,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Created by igreenfi on 9/21/2015.
+ * Singleton wrapper over the Mongo Client Driver
+ * Created by Yair Ogen (yaogen) on 14/01/2016.
  */
 public enum MongoClient {
 
@@ -25,20 +26,18 @@ public enum MongoClient {
 
 	private Logger logger = null;
 	private static final String DATA_CENTER_COLLECTION = "dataCenter";
-
 	private static final int DB_RETRY_DELAY = 10;
-
 	private static final String MASTER_SLAVE_COLLECTION = "masterSlave";
-
 	public AtomicBoolean IS_DB_UP = new AtomicBoolean(false);
 
-	MongoDatabase database;
-	MongoCollection dataCenter;
+	private MongoDatabase database;
+	private MongoCollection dataCenter;
 
-    MongoCollection masterSlave;
+    private MongoCollection masterSlave;
 
-	String mongoUserName = "";
-	String mongoPassword = "";
+	private String mongoUserName = "";
+	private String mongoPassword = "";
+
 	boolean isAuthenticationEnabled = false;
 
     MongoClient() {
@@ -55,6 +54,11 @@ public enum MongoClient {
 		masterSlave		= database.getCollection(MASTER_SLAVE_COLLECTION);
 	}
 
+	/**
+	 * call this method first if you want to enable authenticated mongo db access
+	 * @param user the db user
+	 * @param password teh db pasword
+     */
 	public void enableAuthentication(String user, String password){
 
 		if(StringUtils.isBlank(user)){
@@ -130,10 +134,16 @@ public enum MongoClient {
 		},"Infinite-Reconnect").start();
 	}
 
+	/**
+	 * @return the data center mongo collection
+     */
 	public MongoCollection getDataCenterCollection() {
         return dataCenter;
     }
-    
+
+    /**
+	 * @return the master slave collection
+     */
     public MongoCollection getMasterSlaveCollection() {
         return masterSlave;
     }

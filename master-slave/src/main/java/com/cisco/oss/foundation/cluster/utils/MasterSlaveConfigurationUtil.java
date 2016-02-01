@@ -12,6 +12,10 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * Helper method for reading properties from the config object.
+ * Created by Yair Ogen (yaogen) on 14/01/2016.
+ */
 public class MasterSlaveConfigurationUtil {
 
     public static final String INSTANCE_ID = getUniqueProcessName();
@@ -24,6 +28,10 @@ public class MasterSlaveConfigurationUtil {
     private static Pattern MONGO_SERVERS = Pattern.compile("mongodb\\.([0-9]+)\\.host");
 
 
+    /**
+     * read pairs of host and port from configuration.
+     * @return List of Pairs. Each pair contains host and port.
+     */
     public static List<Pair<String, Integer>> getMongodbServers() {
         List<Pair<String, Integer>> servers = new ArrayList<>();
         Iterator<String> keys = configuration.getKeys();
@@ -40,15 +48,24 @@ public class MasterSlaveConfigurationUtil {
         return servers;
     }
 
-
+    /**
+     * @return the mongo db name
+     */
     public static String getMongodbName() {
         return configuration.getString("mongodb.db.name", "cluster-db");
     }
 
+    /**
+     * @param name the logical name used in the registry class
+     * @return the lease time in seconds
+     */
     public static int getMasterSlaveLeaseTime(String name) {
         return configuration.getInt(name + ".masterSlave.leaseTime", 30);
     }
 
+    /**
+     * @return the component unique name. see wiki for more info: https://github.com/foundation-runtime/cluster/wiki/Master-Slave#instance-identification
+     */
     public static String getUniqueProcessName() {
 
         String rpmSoftwareName = getComponentName();
@@ -66,6 +83,9 @@ public class MasterSlaveConfigurationUtil {
 
     }
 
+    /**
+     * @return the component name. this is not unique and is shared by all instances of the component. see reference: https://github.com/foundation-runtime/cluster/wiki/Master-Slave#instance-identification
+     */
     public static String getComponentName() {
         String rpmSoftwareName = System.getenv(CcpConstants.RPM_SOFTWARE_NAME);
 
