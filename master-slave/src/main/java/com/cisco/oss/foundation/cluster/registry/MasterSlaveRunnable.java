@@ -2,12 +2,14 @@ package com.cisco.oss.foundation.cluster.registry;
 
 import com.allanbank.mongodb.MongoCollection;
 import com.allanbank.mongodb.bson.Document;
+import com.allanbank.mongodb.bson.Element;
 import com.allanbank.mongodb.bson.builder.DocumentBuilder;
 import com.allanbank.mongodb.bson.builder.impl.DocumentBuilderImpl;
 import com.allanbank.mongodb.builder.ConditionBuilder;
 import com.allanbank.mongodb.builder.QueryBuilder;
 import com.cisco.oss.foundation.cluster.mongo.MongoClient;
 import com.cisco.oss.foundation.cluster.utils.MasterSlaveConfigurationUtil;
+import com.cisco.oss.foundation.configuration.CcpConstants;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,6 +29,7 @@ public class MasterSlaveRunnable implements Runnable {
     public static final String COMPONENT = "component";
     public static final String JOB = "job";
     public static final String LEASE_RENEWED = "leaseRenewed";
+    public static final String ACTIVE_VERSION = "activeVersion";
     public static final String ACTIVE_DATACENTER = "activeDatacenter";
     private String name;
     private MasterSlaveListener masterSlaveListener;
@@ -56,6 +59,7 @@ public class MasterSlaveRunnable implements Runnable {
         }
 
         Boolean runThread = MasterSlaveRegistry.INSTANCE.threadController.getOrDefault(name, Boolean.TRUE);
+        String artifactVersion = System.getenv(CcpConstants.ARTIFACT_VERSION);
 
         while (runThread) {
 
@@ -67,52 +71,54 @@ public class MasterSlaveRunnable implements Runnable {
 
                 if (isActiveDC && MongoClient.INSTANCE.IS_DB_UP.get()) {
 
-                    long leaseTaken = System.currentTimeMillis();
+                    long leaseRenewed = System.currentTimeMillis();
 
 
                     MongoCollection masterSlaveCollection = mongoClient.getMasterSlaveCollection();
                     Document document = masterSlaveCollection.findOne(QueryBuilder.where(ID).equals(this.id));
-                    String documentInstanceId = null;
+
+                    //if anything fails - fallback to activeVersion is true
+                    boolean isActiveVersion = true;
 
                     if (document == null) {
-                        DocumentBuilder documentbuilder = new DocumentBuilderImpl();
-                        documentbuilder.add(ID, this.id);
-                        documentbuilder.add(MASTER_INSTANCE_ID, instanceId);
-                        documentbuilder.add(COMPONENT, MasterSlaveConfigurationUtil.COMPONENT_NAME);
-                        documentbuilder.add(JOB, name);
-                        documentbuilder.add(LEASE_RENEWED, 0);
-                        document = documentbuilder.build();
-                        masterSlaveCollection.insert(documentbuilder);
+                        document = createNewDocument(masterSlaveCollection);
                     } else {
                         LOGGER.trace("document in DB: {}", document);
-                        documentInstanceId = document.get(MASTER_INSTANCE_ID).getValueAsString();
+                        Element activeVersionField = document.get(ACTIVE_VERSION);
+                        String activeVersion = activeVersionField != null ? activeVersionField.getValueAsString(): null;
+                        if (StringUtils.isNotBlank(activeVersion)) {
+                            isActiveVersion = artifactVersion != null && artifactVersion.equals(activeVersion);
+                        }
                         DocumentBuilder documentbuilder = new DocumentBuilderImpl(document);
                         documentbuilder.remove(MASTER_INSTANCE_ID);
                         documentbuilder.add(MASTER_INSTANCE_ID, instanceId);
                         documentbuilder.remove(LEASE_RENEWED);
-                        documentbuilder.add(LEASE_RENEWED, leaseTaken);
+                        documentbuilder.add(LEASE_RENEWED, leaseRenewed);
                         document = documentbuilder.build();
                     }
 
-                    long lastExpectedLeaseUpdateTime = leaseTaken - masterSlaveLeaseTime * 1000;
-                    ConditionBuilder timeQuery = QueryBuilder.where(LEASE_RENEWED).lessThanOrEqualTo(lastExpectedLeaseUpdateTime);
-                    Document updateLeaseQuery = QueryBuilder.and(QueryBuilder.where(ID).equals(this.id), timeQuery);
+                    if (isActiveVersion) {
+                        long lastExpectedLeaseUpdateTime = leaseRenewed - masterSlaveLeaseTime * 1000;
+                        ConditionBuilder timeQuery = QueryBuilder.where(LEASE_RENEWED).lessThanOrEqualTo(lastExpectedLeaseUpdateTime);
+                        Document updateLeaseQuery = QueryBuilder.and(QueryBuilder.where(ID).equals(this.id), timeQuery);
 
-                    LOGGER.trace("id: {}, leaseTaken: {}, lease-time: {}, lastExpectedLeaseUpdateTime: {}", id, leaseTaken, masterSlaveLeaseTime, lastExpectedLeaseUpdateTime);
+                        LOGGER.trace("id: {}, leaseRenewed: {}, lease-time: {}, lastExpectedLeaseUpdateTime: {}", id, leaseRenewed, masterSlaveLeaseTime, lastExpectedLeaseUpdateTime);
 //                    long numOfRowsUpdated = masterSlaveCollection.update(updateLeaseQuery, document,false, true);
-                    long numOfRowsUpdated = masterSlaveCollection.update(updateLeaseQuery, document);
+                        long numOfRowsUpdated = masterSlaveCollection.update(updateLeaseQuery, document);
 
-                    LOGGER.trace("document instance-id: {}, my instance-id: {}", documentInstanceId, instanceId);
-                    if (numOfRowsUpdated > 0) {
-                        if (masterNextTimeInvoke.get()) {
-                            goMaster();
+                        if (numOfRowsUpdated > 0) {
+                            if (masterNextTimeInvoke.get()) {
+                                goMaster();
+                            }
+                        } else {
+                            if (slaveNextTimeInvoke.get()) {
+                                goSlave();
+                            }
                         }
-                    } else {
-                        if (slaveNextTimeInvoke.get()) {
-                            goSlave();
-                        }
+                    } else if (slaveNextTimeInvoke.get()) { //Not active version
+                        goSlave();
                     }
-                } else if(!isActiveDC && slaveNextTimeInvoke.get()){
+                } else if (!isActiveDC && slaveNextTimeInvoke.get()) { //Not active Datacenter
                     goSlave();
                 }
 
@@ -128,6 +134,19 @@ public class MasterSlaveRunnable implements Runnable {
             }
 
         }
+    }
+
+    public Document createNewDocument(MongoCollection masterSlaveCollection) {
+        Document document;
+        DocumentBuilder documentbuilder = new DocumentBuilderImpl();
+        documentbuilder.add(ID, this.id);
+        documentbuilder.add(MASTER_INSTANCE_ID, instanceId);
+        documentbuilder.add(COMPONENT, MasterSlaveConfigurationUtil.COMPONENT_NAME);
+        documentbuilder.add(JOB, name);
+        documentbuilder.add(LEASE_RENEWED, 0);
+        document = documentbuilder.build();
+        masterSlaveCollection.insert(documentbuilder);
+        return document;
     }
 
     public void goMaster() {
