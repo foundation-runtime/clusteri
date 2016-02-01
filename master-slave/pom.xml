@@ -26,7 +26,7 @@
     <artifactId>master-slave</artifactId>
     <name>master-slave</name>
     <version>1.0.0-2-SNAPSHOT</version>
-    <description>This project is a multi data ceמter supported master slave cluster manager library</description>
+    <description>This project is a multi data center supported master slave cluster manager library</description>
     <url>https://github.com/foundation-runtime/cluster/master-slave</url>
     <packaging>jar</packaging>
     <licenses>
