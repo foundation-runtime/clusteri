@@ -26,7 +26,7 @@ public class MasterSlaveRunnable implements Runnable {
     public static final String MASTER_INSTANCE_ID = "masterInstanceId";
     public static final String COMPONENT = "component";
     public static final String JOB = "job";
-    public static final String LEASE_TAKEN = "leaseTaken";
+    public static final String LEASE_RENEWED = "leaseRenewed";
     public static final String ACTIVE_DATACENTER = "activeDatacenter";
     private String name;
     private MasterSlaveListener masterSlaveListener;
@@ -80,7 +80,7 @@ public class MasterSlaveRunnable implements Runnable {
                         documentbuilder.add(MASTER_INSTANCE_ID, instanceId);
                         documentbuilder.add(COMPONENT, MasterSlaveConfigurationUtil.COMPONENT_NAME);
                         documentbuilder.add(JOB, name);
-                        documentbuilder.add(LEASE_TAKEN, 0);
+                        documentbuilder.add(LEASE_RENEWED, 0);
                         document = documentbuilder.build();
                         masterSlaveCollection.insert(documentbuilder);
                     } else {
@@ -89,13 +89,13 @@ public class MasterSlaveRunnable implements Runnable {
                         DocumentBuilder documentbuilder = new DocumentBuilderImpl(document);
                         documentbuilder.remove(MASTER_INSTANCE_ID);
                         documentbuilder.add(MASTER_INSTANCE_ID, instanceId);
-                        documentbuilder.remove(LEASE_TAKEN);
-                        documentbuilder.add(LEASE_TAKEN, leaseTaken);
+                        documentbuilder.remove(LEASE_RENEWED);
+                        documentbuilder.add(LEASE_RENEWED, leaseTaken);
                         document = documentbuilder.build();
                     }
 
                     long lastExpectedLeaseUpdateTime = leaseTaken - masterSlaveLeaseTime * 1000;
-                    ConditionBuilder timeQuery = QueryBuilder.where(LEASE_TAKEN).lessThanOrEqualTo(lastExpectedLeaseUpdateTime);
+                    ConditionBuilder timeQuery = QueryBuilder.where(LEASE_RENEWED).lessThanOrEqualTo(lastExpectedLeaseUpdateTime);
                     Document updateLeaseQuery = QueryBuilder.and(QueryBuilder.where(ID).equals(this.id), timeQuery);
 
                     LOGGER.trace("id: {}, leaseTaken: {}, lease-time: {}, lastExpectedLeaseUpdateTime: {}", id, leaseTaken, masterSlaveLeaseTime, lastExpectedLeaseUpdateTime);
