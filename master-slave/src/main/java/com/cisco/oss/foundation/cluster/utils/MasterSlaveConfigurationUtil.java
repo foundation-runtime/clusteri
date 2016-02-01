@@ -52,7 +52,7 @@ public class MasterSlaveConfigurationUtil {
      * @return the mongo db name
      */
     public static String getMongodbName() {
-        return configuration.getString("mongodb.db.name", "cluster-db");
+        return configuration.getString("mongodb.master-slave-db.name", "master-slave-clusters");
     }
 
     /**
