@@ -25,7 +25,7 @@
     <groupId>com.cisco.oss.foundation</groupId>
     <artifactId>master-slave</artifactId>
     <name>master-slave</name>
-    <version>1.0.0-2-SNAPSHOT</version>
+    <version>1.0.0-2</version>
     <description>This project is a multi data center supported master slave cluster manager library</description>
     <url>https://github.com/foundation-runtime/cluster/master-slave</url>
     <packaging>jar</packaging>
@@ -68,7 +68,7 @@
         <connection>scm:git:git@github.com:foundation-runtime/cluster.git</connection>
         <developerConnection>scm:git:git@github.com:foundation-runtime/cluster.git</developerConnection>
         <url>https://github.com/foundation-runtime/cluster.git</url>
-        <tag>HEAD</tag>
+        <tag>master-slave-1.0.0-2</tag>
     </scm>
     <organization>
         <name>Cisco</name>
