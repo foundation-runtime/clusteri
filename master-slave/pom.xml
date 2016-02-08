@@ -185,6 +185,12 @@
             <groupId>com.cisco.oss.foundation</groupId>
             <artifactId>configuration-lib</artifactId>
             <version>${configuration-lib-version}</version>
+            <exclusions>
+                <exclusion>
+                    <artifactId>logging-log4j</artifactId>
+                    <groupId>com.cisco.oss.foundation</groupId>
+                </exclusion>
+            </exclusions>
             <!--<scope>provided</scope>-->
         </dependency>
         <dependency>

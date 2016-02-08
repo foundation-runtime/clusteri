@@ -67,63 +67,16 @@ public class MasterSlaveRunnable implements Runnable {
 
             try {
 
-                boolean isActiveDC = isActiveDC();
-
-                if (isActiveDC && MongoClient.INSTANCE.IS_DB_UP.get()) {
-
-                    long leaseRenewed = System.currentTimeMillis();
-
-
-                    MongoCollection masterSlaveCollection = mongoClient.getMasterSlaveCollection();
-                    Document document = masterSlaveCollection.findOne(QueryBuilder.where(ID).equals(this.id));
-
-                    //if anything fails - fallback to activeVersion is true
-                    boolean isActiveVersion = true;
-
-                    if (document == null) {
-                        document = createNewDocument(masterSlaveCollection);
-                    } else {
-                        LOGGER.trace("document in DB: {}", document);
-                        Element activeVersionField = document.get(ACTIVE_VERSION);
-                        String activeVersion = activeVersionField != null ? activeVersionField.getValueAsString(): null;
-                        if (StringUtils.isNotBlank(activeVersion)) {
-                            isActiveVersion = artifactVersion != null && artifactVersion.equals(activeVersion);
-                        }
-                        DocumentBuilder documentbuilder = new DocumentBuilderImpl(document);
-                        documentbuilder.remove(MASTER_INSTANCE_ID);
-                        documentbuilder.add(MASTER_INSTANCE_ID, instanceId);
-                        documentbuilder.remove(LEASE_RENEWED);
-                        documentbuilder.add(LEASE_RENEWED, leaseRenewed);
-                        document = documentbuilder.build();
-                    }
-
-                    if (isActiveVersion) {
-                        long lastExpectedLeaseUpdateTime = leaseRenewed - masterSlaveLeaseTime * 1000;
-                        ConditionBuilder timeQuery = QueryBuilder.where(LEASE_RENEWED).lessThanOrEqualTo(lastExpectedLeaseUpdateTime);
-                        Document updateLeaseQuery = QueryBuilder.and(QueryBuilder.where(ID).equals(this.id), timeQuery);
-
-                        LOGGER.trace("id: {}, leaseRenewed: {}, lease-time: {}, lastExpectedLeaseUpdateTime: {}", id, leaseRenewed, masterSlaveLeaseTime, lastExpectedLeaseUpdateTime);
-//                    long numOfRowsUpdated = masterSlaveCollection.update(updateLeaseQuery, document,false, true);
-                        long numOfRowsUpdated = masterSlaveCollection.update(updateLeaseQuery, document);
-
-                        if (numOfRowsUpdated > 0) {
-                            if (masterNextTimeInvoke.get()) {
-                                goMaster();
-                            }
-                        } else {
-                            if (slaveNextTimeInvoke.get()) {
-                                goSlave();
-                            }
-                        }
-                    } else if (slaveNextTimeInvoke.get()) { //Not active version
-                        goSlave();
-                    }
-                } else if (!isActiveDC && slaveNextTimeInvoke.get()) { //Not active Datacenter
-                    goSlave();
-                }
+                chooseMaster(artifactVersion, masterSlaveLeaseTime);
 
             } catch (Exception e) {
-                LOGGER.error("problem running maser slave thread for: {}. error is: {}", name, e, e);
+                LOGGER.warn("problem running master slave thread for: {}. RETRYING ONCE. error is: {}", name, e, e);
+                try {
+                    chooseMaster(artifactVersion, masterSlaveLeaseTime);
+                } catch (Exception e1) {
+                    LOGGER.error("problem running master slave thread for: {}. error is: {}", name, e1, e1);
+                    goSlave();
+                }
             } finally {
                 try {
                     TimeUnit.MILLISECONDS.sleep(masterSlaveLeaseTime * 1000);
@@ -133,6 +86,63 @@ public class MasterSlaveRunnable implements Runnable {
                 runThread = MasterSlaveRegistry.INSTANCE.threadController.getOrDefault(name, Boolean.TRUE);
             }
 
+        }
+    }
+
+    private void chooseMaster(String artifactVersion, int masterSlaveLeaseTime) {
+        boolean isActiveDC = isActiveDC();
+
+        if (isActiveDC && MongoClient.INSTANCE.IS_DB_UP.get()) {
+
+            long leaseRenewed = System.currentTimeMillis();
+
+
+            MongoCollection masterSlaveCollection = mongoClient.getMasterSlaveCollection();
+            Document document = masterSlaveCollection.findOne(QueryBuilder.where(ID).equals(this.id));
+
+            //if anything fails - fallback to activeVersion is true
+            boolean isActiveVersion = true;
+
+            if (document == null) {
+                document = createNewDocument(masterSlaveCollection);
+            } else {
+                LOGGER.trace("document in DB: {}", document);
+                Element activeVersionField = document.get(ACTIVE_VERSION);
+                String activeVersion = activeVersionField != null ? activeVersionField.getValueAsString(): null;
+                if (StringUtils.isNotBlank(activeVersion)) {
+                    isActiveVersion = artifactVersion != null && artifactVersion.equals(activeVersion);
+                }
+                DocumentBuilder documentbuilder = new DocumentBuilderImpl(document);
+                documentbuilder.remove(MASTER_INSTANCE_ID);
+                documentbuilder.add(MASTER_INSTANCE_ID, instanceId);
+                documentbuilder.remove(LEASE_RENEWED);
+                documentbuilder.add(LEASE_RENEWED, leaseRenewed);
+                document = documentbuilder.build();
+            }
+
+            if (isActiveVersion) {
+                long lastExpectedLeaseUpdateTime = leaseRenewed - masterSlaveLeaseTime * 1000;
+                ConditionBuilder timeQuery = QueryBuilder.where(LEASE_RENEWED).lessThanOrEqualTo(lastExpectedLeaseUpdateTime);
+                Document updateLeaseQuery = QueryBuilder.and(QueryBuilder.where(ID).equals(this.id), timeQuery);
+
+                LOGGER.trace("id: {}, leaseRenewed: {}, lease-time: {}, lastExpectedLeaseUpdateTime: {}", id, leaseRenewed, masterSlaveLeaseTime, lastExpectedLeaseUpdateTime);
+//                    long numOfRowsUpdated = masterSlaveCollection.update(updateLeaseQuery, document,false, true);
+                long numOfRowsUpdated = masterSlaveCollection.update(updateLeaseQuery, document);
+
+                if (numOfRowsUpdated > 0) {
+                    if (masterNextTimeInvoke.get()) {
+                        goMaster();
+                    }
+                } else {
+                    if (slaveNextTimeInvoke.get()) {
+                        goSlave();
+                    }
+                }
+            } else if (slaveNextTimeInvoke.get()) { //Not active version
+                goSlave();
+            }
+        } else if (!isActiveDC && slaveNextTimeInvoke.get()) { //Not active Datacenter
+            goSlave();
         }
     }
 
