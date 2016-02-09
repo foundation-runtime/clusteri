@@ -46,6 +46,8 @@ public enum MongoClient {
 
 		try {
 			database = connect();
+		} catch (MissingMongoConfigException e) {
+			throw e;
 		} catch (Exception e) {
 			infiniteConnect();
 		}
