@@ -1,5 +1,6 @@
 package com.cisco.oss.foundation.cluster.utils;
 
+import com.cisco.oss.foundation.cluster.mongo.MissingMongoConfigException;
 import com.cisco.oss.foundation.configuration.CcpConstants;
 import org.apache.commons.configuration.Configuration;
 
@@ -45,6 +46,11 @@ public class MasterSlaveConfigurationUtil {
                 servers.add(Pair.of(host,port));
             }
         }
+
+        if(servers.isEmpty()){
+            throw new MissingMongoConfigException("missing mongo db configuration. you have to define at least one array memeber for 'mongodb.<index>.host' and 'mongodb.<index>.port'");
+        }
+
         return servers;
     }
 
