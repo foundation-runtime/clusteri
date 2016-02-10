@@ -28,6 +28,25 @@
                         <PrimitiveValue value="30"/>
                     </DefaultValue>
                 </StructureMemberDefinition>
+                <StructureMemberDefinition name="masterSlave.mastership.multiplicity" type="STRING" description="The mastership multuplicity policy. Values are either single or multi. Multi will act as multu master within an active DC and active version.">
+                    <DefaultValue>
+                        <PrimitiveValue value="single"/>
+                    </DefaultValue>
+                    <Range>
+                        <StringEnum value="single"/>
+                        <StringEnum value="multi"/>
+                    </Range>
+                </StructureMemberDefinition>
+                <StructureMemberDefinition name="masterSlave.mastership.singleAcrossMDC" type="BOOLEAN" description="Setting true means we maintain one master within an active DC.">
+                    <DefaultValue>
+                        <PrimitiveValue value="true"/>
+                    </DefaultValue>
+                </StructureMemberDefinition>
+                <StructureMemberDefinition name="masterSlave.mastership.singleAcrossVersion" type="BOOLEAN" description="Setting true means we maintain one master within an active version as set in the DB.">
+                    <DefaultValue>
+                        <PrimitiveValue value="true"/>
+                    </DefaultValue>
+                </StructureMemberDefinition>
             </StructureDefinition>
         </ParameterType>
 

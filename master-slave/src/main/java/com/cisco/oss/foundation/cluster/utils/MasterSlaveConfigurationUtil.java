@@ -69,6 +69,19 @@ public class MasterSlaveConfigurationUtil {
         return configuration.getInt(name + ".masterSlave.leaseTime", 30);
     }
 
+    public static MasterSlaveMultiplicity getMasterSlaveMultiplicity(String name) {
+        String multiplicity = configuration.getString(name + ".masterSlave.mastership.multiplicity", "single");
+        return MasterSlaveMultiplicity.newInstance(multiplicity);
+    }
+
+    public static boolean isSingleAcrossMDC(String name){
+        return configuration.getBoolean(name + ".masterSlave.mastership.singleAcrossMDC", true);
+    }
+
+    public static boolean isSingleAcrossVersion(String name){
+        return configuration.getBoolean(name + ".masterSlave.mastership.singleAcrossVersion", true);
+    }
+
     /**
      * @return the component unique name. see wiki for more info: https://github.com/foundation-runtime/cluster/wiki/Master-Slave#instance-identification
      */

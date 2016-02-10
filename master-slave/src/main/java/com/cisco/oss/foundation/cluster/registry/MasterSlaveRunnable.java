@@ -90,6 +90,7 @@ public class MasterSlaveRunnable implements Runnable {
     }
 
     private void chooseMaster(String artifactVersion, int masterSlaveLeaseTime) {
+
         boolean isActiveDC = isActiveDC();
 
         if (isActiveDC && MongoClient.INSTANCE.IS_DB_UP.get()) {
@@ -103,13 +104,16 @@ public class MasterSlaveRunnable implements Runnable {
             //if anything fails - fallback to activeVersion is true
             boolean isActiveVersion = true;
 
+
             if (document == null) {
                 document = createNewDocument(masterSlaveCollection);
             } else {
                 LOGGER.trace("document in DB: {}", document);
                 Element activeVersionField = document.get(ACTIVE_VERSION);
-                String activeVersion = activeVersionField != null ? activeVersionField.getValueAsString(): null;
-                if (StringUtils.isNotBlank(activeVersion)) {
+                String activeVersion = activeVersionField != null ? activeVersionField.getValueAsString() : null;
+
+                //if we don't need to be single across versions - we don't care what is the active version
+                if (StringUtils.isNotBlank(activeVersion) && MasterSlaveConfigurationUtil.isSingleAcrossVersion(name)) {
                     isActiveVersion = artifactVersion != null && artifactVersion.equals(activeVersion);
                 }
                 DocumentBuilder documentbuilder = new DocumentBuilderImpl(document);
@@ -121,28 +125,51 @@ public class MasterSlaveRunnable implements Runnable {
             }
 
             if (isActiveVersion) {
-                long lastExpectedLeaseUpdateTime = leaseRenewed - masterSlaveLeaseTime * 1000;
-                ConditionBuilder timeQuery = QueryBuilder.where(LEASE_RENEWED).lessThanOrEqualTo(lastExpectedLeaseUpdateTime);
-                Document updateLeaseQuery = QueryBuilder.and(QueryBuilder.where(ID).equals(this.id), timeQuery);
 
-                LOGGER.trace("id: {}, leaseRenewed: {}, lease-time: {}, lastExpectedLeaseUpdateTime: {}", id, leaseRenewed, masterSlaveLeaseTime, lastExpectedLeaseUpdateTime);
-//                    long numOfRowsUpdated = masterSlaveCollection.update(updateLeaseQuery, document,false, true);
-                long numOfRowsUpdated = masterSlaveCollection.update(updateLeaseQuery, document);
-
-                if (numOfRowsUpdated > 0) {
-                    if (masterNextTimeInvoke.get()) {
-                        goMaster();
+                switch (MasterSlaveConfigurationUtil.getMasterSlaveMultiplicity(name)) {
+                    case SINGLE: {
+                        chooseMasterBasedOnLease(masterSlaveLeaseTime, leaseRenewed, masterSlaveCollection, document);
+                        break;
                     }
-                } else {
-                    if (slaveNextTimeInvoke.get()) {
-                        goSlave();
+                    case MULTI: {
+                        if (masterNextTimeInvoke.get()) {
+                            goMaster();
+                        }
+                        break;
+                    }
+                    default: {
+                        chooseMasterBasedOnLease(masterSlaveLeaseTime, leaseRenewed, masterSlaveCollection, document);
                     }
                 }
+
+
             } else if (slaveNextTimeInvoke.get()) { //Not active version
                 goSlave();
             }
         } else if (!isActiveDC && slaveNextTimeInvoke.get()) { //Not active Datacenter
             goSlave();
+        }
+    }
+
+    private void chooseMasterBasedOnLease(int masterSlaveLeaseTime, long leaseRenewed, MongoCollection masterSlaveCollection, Document document) {
+        long lastExpectedLeaseUpdateTime = leaseRenewed - masterSlaveLeaseTime * 1000;
+        ConditionBuilder timeQuery = QueryBuilder.where(LEASE_RENEWED).lessThanOrEqualTo(lastExpectedLeaseUpdateTime);
+        Document updateLeaseQuery = QueryBuilder.and(QueryBuilder.where(ID).equals(this.id), timeQuery);
+
+        LOGGER.trace("id: {}, leaseRenewed: {}, lease-time: {}, lastExpectedLeaseUpdateTime: {}", id, leaseRenewed, masterSlaveLeaseTime, lastExpectedLeaseUpdateTime);
+//                    long numOfRowsUpdated = masterSlaveCollection.update(updateLeaseQuery, document,false, true);
+        long numOfRowsUpdated = masterSlaveCollection.update(updateLeaseQuery, document);
+
+        if (numOfRowsUpdated > 0) {
+            if (masterNextTimeInvoke.get()) {
+                goMaster();
+            }
+        } else {
+            if (slaveNextTimeInvoke.get()) {
+                if (slaveNextTimeInvoke.get()) {
+                    goSlave();
+                }
+            }
         }
     }
 
@@ -174,6 +201,12 @@ public class MasterSlaveRunnable implements Runnable {
     }
 
     private boolean isActiveDC() {
+
+        //if we don't need to be single across datacetners we're in active DC for all we care.
+        if (!MasterSlaveConfigurationUtil.isSingleAcrossMDC(name)) {
+            return true;
+        }
+
         String currentDC = MasterSlaveConfigurationUtil.ACTIVE_DATA_CENTER;
         if (StringUtils.isBlank(currentDC)) {
             return true;
