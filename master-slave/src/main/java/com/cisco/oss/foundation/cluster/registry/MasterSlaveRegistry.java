@@ -1,12 +1,7 @@
 package com.cisco.oss.foundation.cluster.registry;
 
-import com.allanbank.mongodb.MongoCollection;
-import com.allanbank.mongodb.builder.QueryBuilder;
-import com.cisco.oss.foundation.cluster.mongo.MongoClient;
-import com.cisco.oss.foundation.cluster.utils.MasterSlaveConfigurationUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -51,20 +46,9 @@ public enum MasterSlaveRegistry {
             }
         });
 
-        //cleanup so we don't keep zombie masteres registered
-        Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
-            @Override
-            public void run() {
-                //TODO do we need this or is the firstTime indicator enough?
-                cleanupDB();
-            }
-        }));
     }
 
-    private void cleanupDB() {
-        MongoCollection masterSlaveCollection = MongoClient.INSTANCE.getMasterSlaveCollection();
-        masterSlaveCollection.delete(QueryBuilder.where("instanceId").equals(MasterSlaveConfigurationUtil.INSTANCE_ID));
-    }
+
 
     /**
      * remove a listener and stop its thread. calling this method will revert the work done in the #addMasterSlaveListener method
