@@ -18,31 +18,45 @@ public enum MasterSlaveRegistry {
 
     private ConcurrentMap<String, MasterSlaveListener> listeners = new ConcurrentHashMap<>();
     ConcurrentMap<String, Boolean> threadController = new ConcurrentHashMap<>();
+    ConcurrentMap<String, Thread> masterSlaveThreads = new ConcurrentHashMap<>();
 
 
     /**
      * starts a new thread to control master/slave state.
-     * this method is idempotent and if you call it over and over with the same name - nothing will happen
-     * @param name - logical name of the work unit. you can call this method multiple times with different names and listener and each unique call will create a new thread
+     * this method is idempotent and if you call it over and over with the same jobName - nothing will happen
+     * @param jobName - logical jobName of the work unit. you can call this method multiple times with different jobNames and listener and each unique call will create a new thread
      * @param masterSlaveListener - the listener you implement to get callbacks
      */
-    public void addMasterSlaveListener(String name, MasterSlaveListener masterSlaveListener) {
-        MasterSlaveListener existingListener = listeners.putIfAbsent(name, masterSlaveListener);
+    public void addMasterSlaveListener(String jobName, MasterSlaveListener masterSlaveListener) {
+        MasterSlaveListener existingListener = listeners.putIfAbsent(jobName, masterSlaveListener);
         if (existingListener == null) {
-            startMasterSlaveThread(name, masterSlaveListener);
+            startMasterSlaveThread(jobName, masterSlaveListener);
         }
     }
 
-    private void startMasterSlaveThread(final String name, final MasterSlaveListener masterSlaveListener) {
-        Thread masterSlaveThread = new Thread(new MasterSlaveRunnable(name, masterSlaveListener), name + "_MasterSlaveThread");
+    /**
+     * @param jobName - the jobName
+     * @return true if there is a thread associated with this jobName and it is alive
+     */
+    public boolean isAlive(String jobName) {
+        if(masterSlaveThreads.containsKey(jobName)){
+            return masterSlaveThreads.get(jobName).isAlive();
+        }else{
+            return false;
+        }
+    }
+
+    private void startMasterSlaveThread(final String jobName, final MasterSlaveListener masterSlaveListener) {
+        Thread masterSlaveThread = new Thread(new MasterSlaveRunnable(jobName, masterSlaveListener), jobName + "_MasterSlaveThread");
         masterSlaveThread.setDaemon(true);
         masterSlaveThread.start();
-        threadController.put(name, Boolean.TRUE);
+        masterSlaveThreads.put(jobName,masterSlaveThread);
+        threadController.put(jobName, Boolean.TRUE);
 
         masterSlaveThread.setUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
             @Override
             public void uncaughtException(Thread t, Throwable e) {
-                LOGGER.error("Error running master slave thread for: {}. error is: {}", name, e, e);
+                LOGGER.error("Error running master slave thread for: {}. error is: {}", jobName, e, e);
             }
         });
 
@@ -52,12 +66,13 @@ public enum MasterSlaveRegistry {
 
     /**
      * remove a listener and stop its thread. calling this method will revert the work done in the #addMasterSlaveListener method
-     * @param name logical name of the work unit
+     * @param jobName logical jobName of the work unit
      * @return true if successful. will return false if this method was called without a prior listener being added to the registry or if this moethod is called more than once.
      */
-    public boolean removeMasterSlaveListener(String name) {
-        threadController.put(name, Boolean.FALSE);
-        return listeners.remove(name) != null;
+    public boolean removeMasterSlaveListener(String jobName) {
+        threadController.put(jobName, Boolean.FALSE);
+        masterSlaveThreads.remove(jobName);
+        return listeners.remove(jobName) != null;
     }
 
 
