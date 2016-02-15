@@ -50,5 +50,11 @@
             </StructureDefinition>
         </ParameterType>
 
+        <Parameter name="masterSlave.impl" type="STRING" description="the implementation of mastership election">
+            <DefaultValue>
+                <PrimitiveValue value="consul"/>
+            </DefaultValue>
+        </Parameter>
+
     </NamespaceDefinition>
 </NamespaceDefinitions>
