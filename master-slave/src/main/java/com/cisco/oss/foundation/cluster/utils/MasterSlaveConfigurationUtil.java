@@ -2,6 +2,7 @@ package com.cisco.oss.foundation.cluster.utils;
 
 import com.cisco.oss.foundation.cluster.mongo.MissingMongoConfigException;
 import com.cisco.oss.foundation.configuration.CcpConstants;
+import com.google.common.net.HostAndPort;
 import org.apache.commons.configuration.Configuration;
 
 import com.cisco.oss.foundation.configuration.ConfigurationFactory;
@@ -72,6 +73,12 @@ public class MasterSlaveConfigurationUtil {
     public static MasterSlaveMultiplicity getMasterSlaveMultiplicity(String name) {
         String multiplicity = configuration.getString(name + ".masterSlave.mastership.multiplicity", "single");
         return MasterSlaveMultiplicity.newInstance(multiplicity);
+    }
+
+    public static HostAndPort getConsulHostAndPort(String name) {
+        String consultHostAndPort = configuration.getString("consul.hostAndPort", "localhost:8500");
+        HostAndPort hostAndPort = HostAndPort.fromString(consultHostAndPort);
+        return hostAndPort;
     }
 
     public static boolean isSingleAcrossMDC(String name){

@@ -15,6 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
+ * Mongo implementation for logic for electing new masters.
  * Created by Yair Ogen (yaogen) on 14/02/2016.
  */
 public class MongoMastershipElector implements MastershipElector {

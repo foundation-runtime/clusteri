@@ -1,6 +1,7 @@
 package com.cisco.oss.foundation.cluster.registry;
 
 import com.cisco.oss.foundation.cluster.masterslave.MastershipElector;
+import com.cisco.oss.foundation.cluster.masterslave.consul.ConsulMastershipElector;
 import com.cisco.oss.foundation.cluster.masterslave.mongo.MongoMastershipElector;
 import com.cisco.oss.foundation.cluster.utils.MasterSlaveConfigurationUtil;
 import com.cisco.oss.foundation.configuration.CcpConstants;
@@ -23,7 +24,7 @@ public class MasterSlaveRunnable implements Runnable {
     private String id = null;
     static final ThreadLocal<Boolean> masterNextTimeInvoke = new ThreadLocal<>();
     static final ThreadLocal<Boolean> slaveNextTimeInvoke = new ThreadLocal<>();
-    private MastershipElector mastershipElector = new MongoMastershipElector();
+    private MastershipElector mastershipElector = new ConsulMastershipElector();//new MongoMastershipElector();
 
     public MasterSlaveRunnable(String jobName, MasterSlaveListener masterSlaveListener) {
         this.jobName = jobName;
@@ -82,6 +83,9 @@ public class MasterSlaveRunnable implements Runnable {
             }
 
         }
+
+        //if we get here, we were stopped. we should clean-up
+        mastershipElector.close();
     }
 
     private void chooseMaster(String currentVersion) {
