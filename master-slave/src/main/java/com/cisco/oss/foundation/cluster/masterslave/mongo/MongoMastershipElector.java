@@ -43,9 +43,11 @@ public class MongoMastershipElector implements MastershipElector {
         this.id = id;
         this.jobName = jobName;
         this.masterSlaveLeaseTime = MasterSlaveConfigurationUtil.getMasterSlaveLeaseTime(jobName);
-        document = masterSlaveCollection.findOne(QueryBuilder.where(ID).equals(this.id));
-        if (document == null) {
-            document = createNewDocument();
+        if (isReady()) {
+            document = masterSlaveCollection.findOne(QueryBuilder.where(ID).equals(this.id));
+            if (document == null) {
+                document = createNewDocument();
+            }
         }
     }
 
@@ -58,6 +60,9 @@ public class MongoMastershipElector implements MastershipElector {
     public boolean isActiveVersion(String currentVersion) {
 
         document = masterSlaveCollection.findOne(QueryBuilder.where(ID).equals(this.id));
+        if (document == null) {
+            document = createNewDocument();
+        }
         LOGGER.trace("document in DB: {}", document);
         Element activeVersionField = document.get(ACTIVE_VERSION);
         String activeVersion = activeVersionField != null ? activeVersionField.getValueAsString() : null;

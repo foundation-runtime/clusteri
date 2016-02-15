@@ -24,7 +24,29 @@ public class MasterSlaveRunnable implements Runnable {
     private String id = null;
     static final ThreadLocal<Boolean> masterNextTimeInvoke = new ThreadLocal<>();
     static final ThreadLocal<Boolean> slaveNextTimeInvoke = new ThreadLocal<>();
-    private MastershipElector mastershipElector = new ConsulMastershipElector();//new MongoMastershipElector();
+    private MastershipElector mastershipElector = createElector();
+
+    private MastershipElector createElector() {
+        String mastershipElectorImpl = MasterSlaveConfigurationUtil.getMasterSlaveImpl();
+        LOGGER.info("creating new instance of {} mastership elector", mastershipElectorImpl);
+        switch (mastershipElectorImpl){
+            case "consul":{
+                return new ConsulMastershipElector();
+            }
+            case "mongo":{
+                return new MongoMastershipElector();
+            }
+            default:{
+                try {
+                    Class mastershipElectorImplClass = Class.forName(mastershipElectorImpl);
+                    return (MastershipElector) mastershipElectorImplClass.newInstance();
+                } catch (Exception e) {
+                    LOGGER.error("can't create mastership elector. error is: {}", e);
+                    throw new IllegalArgumentException("can't create mastership elector");
+                }
+            }
+        }
+    }
 
     public MasterSlaveRunnable(String jobName, MasterSlaveListener masterSlaveListener) {
         this.jobName = jobName;

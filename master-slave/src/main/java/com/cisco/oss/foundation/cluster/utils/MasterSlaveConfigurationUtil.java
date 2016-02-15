@@ -55,6 +55,10 @@ public class MasterSlaveConfigurationUtil {
         return servers;
     }
 
+    public static String getMasterSlaveImpl() {
+        return configuration.getString("masterSlave.impl", "consul");
+    }
+
     /**
      * @return the mongo db name
      */
