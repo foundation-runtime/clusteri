@@ -34,7 +34,7 @@ public class ConsulMastershipElector implements MastershipElector {
     @Override
     public void init(String id, String jobName) {
         this.mastershipKey = id;
-        this.activeVersionKey = MasterSlaveConfigurationUtil.COMPONENT_NAME+"-isActive";
+        this.activeVersionKey = MasterSlaveConfigurationUtil.COMPONENT_NAME+"-version";
         HostAndPort consulHostAndPort = MasterSlaveConfigurationUtil.getConsulHostAndPort(jobName);
         try {
             initConsul(consulHostAndPort);
