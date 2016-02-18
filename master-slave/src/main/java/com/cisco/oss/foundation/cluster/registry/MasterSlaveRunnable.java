@@ -28,7 +28,7 @@ public class MasterSlaveRunnable implements Runnable {
 
     private MastershipElector createElector() {
         String mastershipElectorImpl = MasterSlaveConfigurationUtil.getMasterSlaveImpl();
-        LOGGER.info("creating new instance of {} mastership elector", mastershipElectorImpl);
+        LOGGER.info("creating new instance of {} mastership elector for job: {}", mastershipElectorImpl, jobName);
         switch (mastershipElectorImpl){
             case "consul":{
                 return new ConsulMastershipElector();

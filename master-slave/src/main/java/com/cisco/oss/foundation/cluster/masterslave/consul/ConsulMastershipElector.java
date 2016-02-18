@@ -39,7 +39,7 @@ public class ConsulMastershipElector implements MastershipElector {
         try {
             initConsul(consulHostAndPort);
         } catch (ConsulException e) {
-            infiniteConnect(consulHostAndPort);
+            infiniteConnect(consulHostAndPort, jobName);
         }
     }
 
@@ -50,7 +50,7 @@ public class ConsulMastershipElector implements MastershipElector {
         this.sessionId = session.getId();
     }
 
-    private void infiniteConnect(HostAndPort consulHostAndPort) {
+    private void infiniteConnect(HostAndPort consulHostAndPort, String jobName) {
         new Thread(new Runnable() {
             @Override
             public void run() {
@@ -69,7 +69,7 @@ public class ConsulMastershipElector implements MastershipElector {
                     }
                 }
             }
-        },"Infinite-Reconnect").start();
+        },"Infinite-Reconnect-" + jobName).start();
     }
 
     @Override
