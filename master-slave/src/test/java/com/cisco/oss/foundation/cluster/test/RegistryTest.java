@@ -4,7 +4,9 @@ import com.allanbank.mongodb.bson.impl.EmptyDocument;
 import com.cisco.oss.foundation.cluster.mongo.MongoClient;
 import com.cisco.oss.foundation.cluster.registry.MasterSlaveListener;
 import com.cisco.oss.foundation.cluster.registry.MasterSlaveRegistry;
+import com.cisco.oss.foundation.cluster.utils.MasterSlaveConfigurationUtil;
 import com.cisco.oss.foundation.configuration.CcpConstants;
+import org.apache.commons.lang3.tuple.Pair;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -12,6 +14,8 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ThreadFactory;
@@ -27,6 +31,12 @@ public class RegistryTest {
     @BeforeClass
     public static void init(){
         System.setProperty(CcpConstants.RPM_SOFTWARE_NAME,"dummy_component");
+        MasterSlaveConfigurationUtil.setMongodbServerConfigPrefix("mymongodb");
+        List<Pair<String,Integer>> servers = new ArrayList<>();
+
+        servers.add(Pair.of("localhost",27017));
+
+        MasterSlaveConfigurationUtil.setMongodbServers(servers);
     }
 
     @Test
@@ -93,6 +103,7 @@ public class RegistryTest {
         }
         MongoClient.INSTANCE.getMasterSlaveCollection().delete(EmptyDocument.INSTANCE);
         System.gc();
+        MasterSlaveConfigurationUtil.setMongodbServers(new ArrayList<>());
 
     }
 
