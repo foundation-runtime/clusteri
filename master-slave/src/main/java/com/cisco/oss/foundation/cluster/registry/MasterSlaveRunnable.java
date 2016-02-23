@@ -19,12 +19,12 @@ import java.util.concurrent.TimeUnit;
  */
 public class MasterSlaveRunnable implements Runnable {
     private static final Logger LOGGER = LoggerFactory.getLogger(MasterSlaveRunnable.class);
-    private String jobName;
+    private final String jobName;
     private MasterSlaveListener masterSlaveListener;
-    private String id = null;
+    private final String id;
     static final ThreadLocal<Boolean> masterNextTimeInvoke = new ThreadLocal<>();
     static final ThreadLocal<Boolean> slaveNextTimeInvoke = new ThreadLocal<>();
-    private MastershipElector mastershipElector = createElector();
+    private final MastershipElector mastershipElector;
 
     private MastershipElector createElector() {
         String mastershipElectorImpl = MasterSlaveConfigurationUtil.getMasterSlaveImpl();
@@ -50,6 +50,7 @@ public class MasterSlaveRunnable implements Runnable {
 
     public MasterSlaveRunnable(String jobName, MasterSlaveListener masterSlaveListener) {
         this.jobName = jobName;
+        mastershipElector = createElector();
         this.masterSlaveListener = masterSlaveListener;
         this.id = MasterSlaveConfigurationUtil.COMPONENT_NAME + "-" + jobName;
 

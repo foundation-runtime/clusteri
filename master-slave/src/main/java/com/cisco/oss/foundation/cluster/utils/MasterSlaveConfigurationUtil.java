@@ -32,7 +32,7 @@ public class MasterSlaveConfigurationUtil {
 
     private static Pattern MONGO_SERVERS = Pattern.compile(mongodbServerConfigPrefix + "\\.([0-9]+)\\.host");
 
-    private static List<Pair<String, Integer>> mongodbServers = new ArrayList<>();
+    private final static List<Pair<String, Integer>> mongodbServers = new ArrayList<>();
 
     /**
      * When set to read mongo servers from configuration you can override the configuration prefix using this method.
@@ -52,7 +52,7 @@ public class MasterSlaveConfigurationUtil {
      * @param mongodbServers
      */
     public static void setMongodbServers(List<Pair<String, Integer>> mongodbServers) {
-        MasterSlaveConfigurationUtil.mongodbServers = mongodbServers;
+        MasterSlaveConfigurationUtil.mongodbServers.addAll(mongodbServers);
     }
 
 
