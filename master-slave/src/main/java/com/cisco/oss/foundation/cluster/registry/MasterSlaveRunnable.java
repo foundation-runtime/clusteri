@@ -24,7 +24,7 @@ public class MasterSlaveRunnable implements Runnable {
     private String id = null;
     static final ThreadLocal<Boolean> masterNextTimeInvoke = new ThreadLocal<>();
     static final ThreadLocal<Boolean> slaveNextTimeInvoke = new ThreadLocal<>();
-    private MastershipElector mastershipElector = createElector();
+    private MastershipElector mastershipElector = null;
 
     private MastershipElector createElector() {
         String mastershipElectorImpl = MasterSlaveConfigurationUtil.getMasterSlaveImpl();
@@ -50,6 +50,7 @@ public class MasterSlaveRunnable implements Runnable {
 
     public MasterSlaveRunnable(String jobName, MasterSlaveListener masterSlaveListener) {
         this.jobName = jobName;
+        mastershipElector = createElector();
         this.masterSlaveListener = masterSlaveListener;
         this.id = MasterSlaveConfigurationUtil.COMPONENT_NAME + "-" + jobName;
 
