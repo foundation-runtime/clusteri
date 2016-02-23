@@ -6,6 +6,7 @@ import com.google.common.net.HostAndPort;
 import org.apache.commons.configuration.Configuration;
 
 import com.cisco.oss.foundation.configuration.ConfigurationFactory;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.ArrayList;
@@ -27,7 +28,32 @@ public class MasterSlaveConfigurationUtil {
 
     private static Configuration configuration = ConfigurationFactory.getConfiguration();
 
-    private static Pattern MONGO_SERVERS = Pattern.compile("mongodb\\.([0-9]+)\\.host");
+    private static String mongodbServerConfigPrefix = "mongodb";
+
+    private static Pattern MONGO_SERVERS = Pattern.compile(mongodbServerConfigPrefix + "\\.([0-9]+)\\.host");
+
+    private final static List<Pair<String, Integer>> mongodbServers = new ArrayList<>();
+
+    /**
+     * When set to read mongo servers from configuration you can override the configuration prefix using this method.
+     * If called with emppty or null prefix, the default will be used
+     * @param mongodbServerConfigPrefix - the new prefix. default is: 'mongodb'.
+     */
+    public static void setMongodbServerConfigPrefix(String mongodbServerConfigPrefix) {
+        if (StringUtils.isNotBlank(mongodbServerConfigPrefix)) {
+            MasterSlaveConfigurationUtil.mongodbServerConfigPrefix = mongodbServerConfigPrefix;
+            MONGO_SERVERS = Pattern.compile(MasterSlaveConfigurationUtil.mongodbServerConfigPrefix + "\\.([0-9]+)\\.host");
+        }
+    }
+
+
+    /**
+     * Use this API if you want to external set the mongo servers list and prevent the lib from fetching the info from configuration
+     * @param mongodbServers
+     */
+    public static void setMongodbServers(List<Pair<String, Integer>> mongodbServers) {
+        MasterSlaveConfigurationUtil.mongodbServers.addAll(mongodbServers);
+    }
 
 
     /**
@@ -35,24 +61,26 @@ public class MasterSlaveConfigurationUtil {
      * @return List of Pairs. Each pair contains host and port.
      */
     public static List<Pair<String, Integer>> getMongodbServers() {
-        List<Pair<String, Integer>> servers = new ArrayList<>();
-        Iterator<String> keys = configuration.getKeys();
-        while (keys.hasNext()) {
-            String key = keys.next();
-            Matcher matcher = MONGO_SERVERS.matcher(key);
-            if (matcher.matches()) {
-                String index = matcher.group(1);
-                String host = configuration.getString(key);
-                Integer port = configuration.getInt("mongodb." + index + ".port");
-                servers.add(Pair.of(host,port));
+
+        if(mongodbServers.isEmpty()){
+            Iterator<String> keys = configuration.getKeys();
+            while (keys.hasNext()) {
+                String key = keys.next();
+                Matcher matcher = MONGO_SERVERS.matcher(key);
+                if (matcher.matches()) {
+                    String index = matcher.group(1);
+                    String host = configuration.getString(key);
+                    Integer port = configuration.getInt(mongodbServerConfigPrefix + "." + index + ".port");
+                    mongodbServers.add(Pair.of(host,port));
+                }
             }
         }
 
-        if(servers.isEmpty()){
+        if(mongodbServers.isEmpty()){
             throw new MissingMongoConfigException("missing mongo db configuration. you have to define at least one array memeber for 'mongodb.<index>.host' and 'mongodb.<index>.port'");
         }
 
-        return servers;
+        return mongodbServers;
     }
 
     public static String getMasterSlaveImpl() {
