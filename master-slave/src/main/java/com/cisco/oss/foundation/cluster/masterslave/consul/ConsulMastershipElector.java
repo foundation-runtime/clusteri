@@ -9,9 +9,12 @@ import com.orbitz.consul.ConsulException;
 import com.orbitz.consul.model.session.ImmutableSession;
 import com.orbitz.consul.model.session.Session;
 import com.orbitz.consul.model.session.SessionCreatedResponse;
+import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.ws.rs.InternalServerErrorException;
+import java.io.InputStream;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -107,7 +110,17 @@ public class ConsulMastershipElector implements MastershipElector {
 
     @Override
     public boolean isMaster() {
-        boolean lockAcquired = consul.keyValueClient().acquireLock(mastershipKey, sessionId);
+        boolean lockAcquired = false;
+        try {
+            lockAcquired = consul.keyValueClient().acquireLock(mastershipKey, sessionId);
+        } catch (InternalServerErrorException e) {
+            String response = e.getResponse().readEntity(String.class);
+            if(response.contains("invalid session")){
+                SessionCreatedResponse session = consul.sessionClient().createSession(ImmutableSession.builder().name(MasterSlaveConfigurationUtil.INSTANCE_ID).build());
+                this.sessionId = session.getId();
+            }
+            lockAcquired = consul.keyValueClient().acquireLock(mastershipKey, sessionId);
+        }
         return lockAcquired;
     }
 
