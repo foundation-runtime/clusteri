@@ -2,19 +2,19 @@ package com.cisco.oss.foundation.cluster.masterslave.consul;
 
 import com.cisco.oss.foundation.cluster.masterslave.MastershipElector;
 import com.cisco.oss.foundation.cluster.utils.MasterSlaveConfigurationUtil;
-import com.google.common.base.Optional;
+import com.cisco.oss.foundation.configuration.ConfigurationFactory;
+import com.cisco.oss.foundation.http.HttpClient;
+import com.cisco.oss.foundation.http.HttpMethod;
+import com.cisco.oss.foundation.http.HttpRequest;
+import com.cisco.oss.foundation.http.HttpResponse;
+import com.cisco.oss.foundation.http.apache.ApacheHttpClientFactory;
+import com.google.common.io.BaseEncoding;
 import com.google.common.net.HostAndPort;
-import com.orbitz.consul.Consul;
-import com.orbitz.consul.ConsulException;
-import com.orbitz.consul.model.session.ImmutableSession;
-import com.orbitz.consul.model.session.Session;
-import com.orbitz.consul.model.session.SessionCreatedResponse;
-import org.apache.commons.io.IOUtils;
+import com.jayway.jsonpath.JsonPath;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.ws.rs.InternalServerErrorException;
-import java.io.InputStream;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -26,108 +26,253 @@ public class ConsulMastershipElector implements MastershipElector {
 
     public static final String ACTIVE_DATACENTER = "activeDatacenter";
     private static final Logger LOGGER = LoggerFactory.getLogger(ConsulMastershipElector.class);
-    private static final int CONSUL_RETRY_DELAY = 10;
-    private Consul consul = null;
+    private HttpClient consulClient;
     private String activeVersionKey = "";
     private String sessionId = "";
     private String mastershipKey = "";
-    public final AtomicBoolean IS_CONSUL_UP = new AtomicBoolean(false);
-
+    private String jobName;
+    private Thread sessionTTlThread;
+    private String checkId;
+    private int ttlUpdateTime;
 
     @Override
     public void init(String id, String jobName) {
         this.mastershipKey = id;
-        this.activeVersionKey = MasterSlaveConfigurationUtil.COMPONENT_NAME+"-version";
+        this.jobName = jobName;
+        this.activeVersionKey = MasterSlaveConfigurationUtil.COMPONENT_NAME + "-version";
         HostAndPort consulHostAndPort = MasterSlaveConfigurationUtil.getConsulHostAndPort(jobName);
-        try {
-            initConsul(consulHostAndPort);
-        } catch (ConsulException e) {
-            infiniteConnect(consulHostAndPort, jobName);
-        }
+//        try {
+        initConsul(consulHostAndPort);
+//        } catch (ConsulException e) {
+//            infiniteConnect(consulHostAndPort, jobName);
+//        }
     }
 
     private void initConsul(HostAndPort consulHostAndPort) {
 
-        this.consul = Consul.builder().withHostAndPort(consulHostAndPort).build();
-        SessionCreatedResponse session = consul.sessionClient().createSession(ImmutableSession.builder().name(MasterSlaveConfigurationUtil.INSTANCE_ID).build());
-        this.sessionId = session.getId();
+        ConfigurationFactory.getConfiguration().setProperty("consulClient.1.host", consulHostAndPort.getHostText());
+        ConfigurationFactory.getConfiguration().setProperty("consulClient.1.port", consulHostAndPort.getPort());
+        ConfigurationFactory.getConfiguration().setProperty("consulClient.http.waitingTime", "0");
+        ConfigurationFactory.getConfiguration().setProperty("consulClient.http.exposeStatisticsToMonitor", "false");
+        consulClient = ApacheHttpClientFactory.createHttpClient("consulClient");
+
+        registerCheck();
+
+        createSession();
     }
 
-    private void infiniteConnect(HostAndPort consulHostAndPort, String jobName) {
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                while(!IS_CONSUL_UP.get()){
-                    try {
-                        initConsul(consulHostAndPort);
-                        IS_CONSUL_UP.set(true);
-                        LOGGER.info("consul reconnect is successful");
-                    } catch (Exception e) {
-                        LOGGER.warn("consul reconnect failed. retrying in {} seconds. error: {}", CONSUL_RETRY_DELAY, e);
-                        try {
-                            TimeUnit.SECONDS.sleep(CONSUL_RETRY_DELAY);
-                        } catch (InterruptedException e1) {
-                            //ignore
+    private void registerCheck() {
+        checkId = mastershipKey + "-TTLCheck";
+        int ttlPeriod = MasterSlaveConfigurationUtil.getMasterSlaveLeaseTime(jobName);
+        ttlUpdateTime = ttlPeriod / 3;
+
+        String ttlCheck = "{\n" +
+                "    \"ID\": \"" + checkId + "\",\n" +
+                "    \"Name\": \"" + mastershipKey + " Status\",\n" +
+                "    \"Notes\": \"background process does a curl internally every " + ttlUpdateTime + " seconds\",\n" +
+                "    \"TTL\": \"" + ttlPeriod + "s\"\n" +
+                "}";
+
+        HttpRequest registerCheck = HttpRequest.newBuilder()
+                .httpMethod(HttpMethod.PUT)
+                .uri("/v1/agent/check/register")
+                .entity(ttlCheck)
+                .build();
+
+        execute(registerCheck,true,"register health check");
+
+    }
+
+    private void closeSession() {
+
+        HttpRequest destroySession = HttpRequest.newBuilder()
+                .httpMethod(HttpMethod.PUT)
+                .uri("/v1/session/destroy/" + sessionId)
+                .build();
+
+        execute(destroySession,false,"destroy session");
+
+
+        if (sessionTTlThread != null) {
+            sessionTTlThread.interrupt();
+        }
+        sessionTTlThread = null;
+    }
+
+    private void createSession() {
+
+
+        startSessionHeartbeatThread(ttlUpdateTime);
+        try {
+            TimeUnit.SECONDS.sleep(2);
+        } catch (InterruptedException e) {
+            //ignore
+        }
+
+        String body = "{\n" +
+                "  \"Name\": \"" + MasterSlaveConfigurationUtil.INSTANCE_ID + "\",\n" +
+                "  \"Checks\": [\"" + checkId + "\", \"serfHealth\"]\n" +
+                "}";
+
+        HttpRequest createSession = HttpRequest.newBuilder()
+                .httpMethod(HttpMethod.PUT)
+                .uri("/v1/session/create")
+                .entity(body)
+                .build();
+
+        HttpResponse response = execute(createSession, true, "create session");
+
+        String jsonId = response.getResponseAsString();
+        this.sessionId = JsonPath.parse(jsonId).read("$.ID");
+    }
+
+    private void startSessionHeartbeatThread(int ttlUpdateTime) {
+        sessionTTlThread = new Thread(() -> {
+            while (true) {
+                try {
+                    HttpRequest passCheck = HttpRequest.newBuilder()
+                            .httpMethod(HttpMethod.GET)
+                            .uri("/v1/agent/check/pass/" + checkId)
+                            .silentLogging()
+                            .build();
+
+                    HttpResponse response = consulClient.execute(passCheck);
+                    if (!response.isSuccess()) {
+                        String passCheckResponse = response.getResponseAsString();
+                        LOGGER.error("failed to pass check. got response: {}, error response: {}", response.getStatus(), passCheckResponse);
+                        if(StringUtils.isNotEmpty(passCheckResponse) && passCheckResponse.contains("CheckID does not have associated TTL")){
+                            registerCheck();
                         }
+                    }
+                } catch (Exception e) {
+                    LOGGER.warn("problem in heartbeat: {}", e);
+                }finally{
+                    try {
+                        TimeUnit.SECONDS.sleep(ttlUpdateTime);
+                    } catch (InterruptedException e) {
+                        //ignore
                     }
                 }
             }
-        },"Infinite-Reconnect-" + jobName).start();
+        }, checkId + "Thread");
+        sessionTTlThread.setDaemon(true);
+        sessionTTlThread.start();
     }
+
 
     @Override
     public boolean isReady() {
-        try {
-            if(consul != null){
-                consul.agentClient().ping();
-                return true;
-            }else{
-                return false;
+        HttpRequest ping = HttpRequest.newBuilder()
+                .httpMethod(HttpMethod.GET)
+                .uri("/v1/agent/self")
+                .silentLogging()
+                .build();
+
+
+        HttpResponse response = execute(ping,false,"ping agent");
+
+        return response.isSuccess();
+
+
+    }
+
+
+    public boolean isActiveKeyValue(String key, String currentValue) {
+
+        HttpRequest getActiveKey = HttpRequest.newBuilder()
+                .httpMethod(HttpMethod.GET)
+                .uri("/v1/kv/" + key)
+                .build();
+
+        HttpResponse response = consulClient.execute(getActiveKey);
+        if (!response.isSuccess()) {
+            LOGGER.debug("failed to get value from KV store. got response: {}, error response: {}", response.getStatus(), response.getResponseAsString());
+        }else{
+            String jsonKeyValue = response.getResponseAsString();
+            String valueInBase64 = JsonPath.parse(jsonKeyValue).read("$.[0].Value");
+
+            if(StringUtils.isNotEmpty(valueInBase64)){
+                String value = new String(BaseEncoding.base64().decode(valueInBase64));
+                return currentValue.equals(value);
             }
-        } catch (Exception e) {
-            LOGGER.error("can't ping the agent. error: {}", e);
-            return false;
         }
+//
+        return true;
     }
 
     @Override
     public boolean isActiveVersion(String currentVersion) {
-        Optional<String> valueAsString = consul.keyValueClient().getValueAsString(activeVersionKey);
-        if(valueAsString.isPresent()){
-            return currentVersion.equals(valueAsString.get());
-        }
-        return true;
+
+        return isActiveKeyValue(activeVersionKey, currentVersion);
     }
 
     @Override
     public boolean isActiveDataCenter(String currentDataCenter) {
-        Optional<String> valueAsString = consul.keyValueClient().getValueAsString(ACTIVE_DATACENTER);
-        if(valueAsString.isPresent()){
-            return currentDataCenter.equals(valueAsString.get());
-        }
-        return true;
+
+        return isActiveKeyValue(ACTIVE_DATACENTER, currentDataCenter);
+
     }
 
     @Override
     public boolean isMaster() {
         boolean lockAcquired = false;
-        try {
-            lockAcquired = consul.keyValueClient().acquireLock(mastershipKey, sessionId);
-        } catch (InternalServerErrorException e) {
-            String response = e.getResponse().readEntity(String.class);
-            if(response.contains("invalid session")){
-                SessionCreatedResponse session = consul.sessionClient().createSession(ImmutableSession.builder().name(MasterSlaveConfigurationUtil.INSTANCE_ID).build());
-                this.sessionId = session.getId();
+
+
+        HttpRequest acquireLock = HttpRequest.newBuilder()
+                .httpMethod(HttpMethod.PUT)
+                .uri("/v1/kv/" + mastershipKey)
+                .queryParams("acquire", sessionId)
+                .build();
+
+        HttpResponse response = consulClient.execute(acquireLock);
+        String responseAsString = response.getResponseAsString();
+        if (!response.isSuccess()) {
+            LOGGER.error("failed to acquire lock. got response: {}, error response: {}", response.getStatus(), responseAsString);
+
+            if (responseAsString.contains("invalid session")) {
+                closeSession();
+                createSession();
+
+                acquireLock = HttpRequest.newBuilder()
+                        .httpMethod(HttpMethod.PUT)
+                        .uri("/v1/kv/" + mastershipKey)
+                        .queryParams("acquire", sessionId)
+                        .build();
+
+                execute(acquireLock, false, "acquire lock");
+
             }
-            lockAcquired = consul.keyValueClient().acquireLock(mastershipKey, sessionId);
+        }else{
+            lockAcquired = Boolean.valueOf(responseAsString);
         }
+
         return lockAcquired;
     }
 
     @Override
     public void close() {
-        if (consul != null) {
-            consul.keyValueClient().releaseLock(mastershipKey, sessionId);
+        if (consulClient != null) {
+            HttpRequest releaseLock = HttpRequest.newBuilder()
+                    .httpMethod(HttpMethod.PUT)
+                    .uri("/v1/kv/" + mastershipKey)
+                    .queryParams("release", sessionId)
+                    .build();
+
+            execute(releaseLock,false,"release lock");
+            closeSession();
         }
+    }
+
+    private HttpResponse execute(HttpRequest request, boolean throwOnError, String opName){
+        HttpResponse response = consulClient.execute(request);
+        String responseAsString = response.getResponseAsString();
+        if (!response.isSuccess()) {
+            LOGGER.error("failed to "+opName+". got response: {}, error response: {}", response.getStatus(), responseAsString);
+            if(throwOnError){
+                throw new ConsulException("failed to "+opName+". status: " + response.getStatus());
+            }
+        }
+
+        return response;
     }
 }

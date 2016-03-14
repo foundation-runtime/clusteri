@@ -1,6 +1,7 @@
 package com.cisco.oss.foundation.cluster.test;
 
 import com.allanbank.mongodb.bson.impl.EmptyDocument;
+import com.cisco.oss.foundation.cluster.masterslave.consul.ConsulMastershipElector;
 import com.cisco.oss.foundation.cluster.mongo.MongoClient;
 import com.cisco.oss.foundation.cluster.registry.MasterSlaveListener;
 import com.cisco.oss.foundation.cluster.registry.MasterSlaveRegistry;
@@ -14,6 +15,7 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.ws.rs.client.Client;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -42,7 +44,6 @@ public class RegistryTest {
     @Test
     public void runOnelistener(){
 
-
         CountDownLatch countDownLatch = new CountDownLatch(1);
 
         MasterSlaveRegistry.INSTANCE.addMasterSlaveListener("test1", new MasterSlaveListener() {
@@ -59,7 +60,7 @@ public class RegistryTest {
         });
 
         try {
-            Assert.assertTrue(countDownLatch.await(5, TimeUnit.SECONDS));
+            Assert.assertTrue(countDownLatch.await(5, TimeUnit.HOURS));
         } catch (InterruptedException e) {
             Assert.fail(e.toString());
         }
