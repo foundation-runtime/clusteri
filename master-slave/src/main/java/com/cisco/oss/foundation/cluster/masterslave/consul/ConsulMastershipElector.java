@@ -10,7 +10,9 @@ import com.cisco.oss.foundation.http.HttpResponse;
 import com.cisco.oss.foundation.http.apache.ApacheHttpClientFactory;
 import com.google.common.io.BaseEncoding;
 import com.google.common.net.HostAndPort;
+import com.jayway.jsonpath.Configuration;
 import com.jayway.jsonpath.JsonPath;
+import com.jayway.jsonpath.Option;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,6 +36,8 @@ public class ConsulMastershipElector implements MastershipElector {
     private Thread sessionTTlThread;
     private String checkId;
     private int ttlUpdateTime;
+    private Configuration conf = Configuration.defaultConfiguration();
+    private Configuration nullableConf = conf.addOptions(Option.DEFAULT_PATH_LEAF_TO_NULL);
 
     @Override
     public void init(String id, String jobName) {
@@ -57,6 +61,14 @@ public class ConsulMastershipElector implements MastershipElector {
         consulClient = ApacheHttpClientFactory.createHttpClient("consulClient");
 
         registerCheck();
+
+
+        startSessionHeartbeatThread(ttlUpdateTime);
+        try {
+            TimeUnit.SECONDS.sleep(2);
+        } catch (InterruptedException e) {
+            //ignore
+        }
 
         createSession();
     }
@@ -91,23 +103,9 @@ public class ConsulMastershipElector implements MastershipElector {
                 .build();
 
         execute(destroySession,false,"destroy session");
-
-
-        if (sessionTTlThread != null) {
-            sessionTTlThread.interrupt();
-        }
-        sessionTTlThread = null;
     }
 
     private void createSession() {
-
-
-        startSessionHeartbeatThread(ttlUpdateTime);
-        try {
-            TimeUnit.SECONDS.sleep(2);
-        } catch (InterruptedException e) {
-            //ignore
-        }
 
         String body = "{\n" +
                 "  \"Name\": \"" + MasterSlaveConfigurationUtil.INSTANCE_ID + "\",\n" +
@@ -124,6 +122,7 @@ public class ConsulMastershipElector implements MastershipElector {
 
         String jsonId = response.getResponseAsString();
         this.sessionId = JsonPath.parse(jsonId).read("$.ID");
+        LOGGER.info("new Session Id is: {}", sessionId);
     }
 
     private void startSessionHeartbeatThread(int ttlUpdateTime) {
@@ -182,6 +181,7 @@ public class ConsulMastershipElector implements MastershipElector {
         HttpRequest getActiveKey = HttpRequest.newBuilder()
                 .httpMethod(HttpMethod.GET)
                 .uri("/v1/kv/" + key)
+                .silentLogging()
                 .build();
 
         HttpResponse response = consulClient.execute(getActiveKey);
@@ -217,11 +217,26 @@ public class ConsulMastershipElector implements MastershipElector {
     public boolean isMaster() {
         boolean lockAcquired = false;
 
+        HttpRequest getSession = HttpRequest.newBuilder()
+                .httpMethod(HttpMethod.GET)
+                .uri("/v1/kv/" + mastershipKey)
+                .silentLogging()
+                .build();
+
+        HttpResponse getSessionResponse = consulClient.execute(getSession);
+        if (getSessionResponse.isSuccess()) {
+            String sessionOwner = JsonPath.using(nullableConf).parse(getSessionResponse.getResponseAsString()).read("$.[0].Session");
+            if (StringUtils.isNoneBlank(sessionOwner)) {
+                return sessionId.equals(sessionOwner);
+            }
+        }
+
 
         HttpRequest acquireLock = HttpRequest.newBuilder()
                 .httpMethod(HttpMethod.PUT)
                 .uri("/v1/kv/" + mastershipKey)
                 .queryParams("acquire", sessionId)
+                .silentLogging()
                 .build();
 
         HttpResponse response = consulClient.execute(acquireLock);
@@ -237,15 +252,19 @@ public class ConsulMastershipElector implements MastershipElector {
                         .httpMethod(HttpMethod.PUT)
                         .uri("/v1/kv/" + mastershipKey)
                         .queryParams("acquire", sessionId)
+                        .silentLogging()
                         .build();
 
-                execute(acquireLock, false, "acquire lock");
-
+                HttpResponse acquireLockRetryResponse = execute(acquireLock, false, "acquire lock");
+                if(acquireLockRetryResponse.isSuccess()){
+                    lockAcquired = Boolean.valueOf(acquireLockRetryResponse.getResponseAsString());
+                }
             }
         }else{
             lockAcquired = Boolean.valueOf(responseAsString);
         }
 
+        LOGGER.info("lock acquired: {}", lockAcquired);
         return lockAcquired;
     }
 
