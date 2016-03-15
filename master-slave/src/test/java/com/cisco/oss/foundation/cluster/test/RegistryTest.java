@@ -59,7 +59,7 @@ public class RegistryTest {
         });
 
         try {
-            Assert.assertTrue(countDownLatch.await(5, TimeUnit.HOURS));
+            Assert.assertTrue(countDownLatch.await(5, TimeUnit.SECONDS));
         } catch (InterruptedException e) {
             Assert.fail(e.toString());
         }
