@@ -1,6 +1,7 @@
 package com.cisco.oss.foundation.cluster.test;
 
 import com.allanbank.mongodb.bson.impl.EmptyDocument;
+import com.cisco.oss.foundation.cluster.masterslave.consul.ConsulMastershipElector;
 import com.cisco.oss.foundation.cluster.mongo.MongoClient;
 import com.cisco.oss.foundation.cluster.registry.MasterSlaveListener;
 import com.cisco.oss.foundation.cluster.registry.MasterSlaveRegistry;
@@ -41,7 +42,6 @@ public class RegistryTest {
 
     @Test
     public void runOnelistener(){
-
 
         CountDownLatch countDownLatch = new CountDownLatch(1);
 
