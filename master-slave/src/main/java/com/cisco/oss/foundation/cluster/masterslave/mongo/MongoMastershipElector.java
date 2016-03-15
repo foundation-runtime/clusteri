@@ -10,6 +10,7 @@ import com.allanbank.mongodb.builder.QueryBuilder;
 import com.cisco.oss.foundation.cluster.masterslave.MastershipElector;
 import com.cisco.oss.foundation.cluster.mongo.MongoClient;
 import com.cisco.oss.foundation.cluster.utils.MasterSlaveConfigurationUtil;
+import com.cisco.oss.foundation.configuration.CcpConstants;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -123,5 +124,10 @@ public class MongoMastershipElector implements MastershipElector {
         document = documentbuilder.build();
         masterSlaveCollection.insert(documentbuilder);
         return document;
+    }
+
+    @Override
+    public String getActiveVersion() {
+        return System.getenv(CcpConstants.ARTIFACT_VERSION);
     }
 }

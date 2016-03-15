@@ -52,7 +52,7 @@
 
         <Parameter name="masterSlave.impl" type="STRING" description="the implementation of mastership election">
             <DefaultValue>
-                <PrimitiveValue value="consul"/>
+                <PrimitiveValue value="consul-openstack"/>
             </DefaultValue>
         </Parameter>
 

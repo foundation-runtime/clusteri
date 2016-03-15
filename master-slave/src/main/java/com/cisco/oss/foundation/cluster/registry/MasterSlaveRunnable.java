@@ -2,6 +2,7 @@ package com.cisco.oss.foundation.cluster.registry;
 
 import com.cisco.oss.foundation.cluster.masterslave.MastershipElector;
 import com.cisco.oss.foundation.cluster.masterslave.consul.ConsulMastershipElector;
+import com.cisco.oss.foundation.cluster.masterslave.consul.OpenstackConsulMastershipElector;
 import com.cisco.oss.foundation.cluster.masterslave.mongo.MongoMastershipElector;
 import com.cisco.oss.foundation.cluster.utils.MasterSlaveConfigurationUtil;
 import com.cisco.oss.foundation.configuration.CcpConstants;
@@ -32,6 +33,9 @@ public class MasterSlaveRunnable implements Runnable {
         switch (mastershipElectorImpl){
             case "consul":{
                 return new ConsulMastershipElector();
+            }
+            case "consul-openstack":{
+                return new OpenstackConsulMastershipElector();
             }
             case "mongo":{
                 return new MongoMastershipElector();
@@ -77,7 +81,7 @@ public class MasterSlaveRunnable implements Runnable {
         }
 
         Boolean runThread = MasterSlaveRegistry.INSTANCE.threadController.getOrDefault(jobName, Boolean.TRUE);
-        String currentVersion = System.getenv(CcpConstants.ARTIFACT_VERSION);
+        String currentVersion = mastershipElector.getActiveVersion();
         mastershipElector.init(id, jobName);
 
         while (runThread) {

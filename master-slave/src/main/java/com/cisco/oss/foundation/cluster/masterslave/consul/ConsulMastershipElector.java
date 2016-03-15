@@ -2,6 +2,7 @@ package com.cisco.oss.foundation.cluster.masterslave.consul;
 
 import com.cisco.oss.foundation.cluster.masterslave.MastershipElector;
 import com.cisco.oss.foundation.cluster.utils.MasterSlaveConfigurationUtil;
+import com.cisco.oss.foundation.configuration.CcpConstants;
 import com.cisco.oss.foundation.configuration.ConfigurationFactory;
 import com.cisco.oss.foundation.http.HttpClient;
 import com.cisco.oss.foundation.http.HttpMethod;
@@ -28,28 +29,24 @@ public class ConsulMastershipElector implements MastershipElector {
 
     public static final String ACTIVE_DATACENTER = "activeDatacenter";
     private static final Logger LOGGER = LoggerFactory.getLogger(ConsulMastershipElector.class);
-    private HttpClient consulClient;
-    private String activeVersionKey = "";
-    private String sessionId = "";
-    private String mastershipKey = "";
-    private String jobName;
-    private Thread sessionTTlThread;
-    private String checkId;
-    private int ttlUpdateTime;
-    private Configuration conf = Configuration.defaultConfiguration();
-    private Configuration nullableConf = conf.addOptions(Option.DEFAULT_PATH_LEAF_TO_NULL);
+    protected HttpClient consulClient;
+    protected String activeVersionKey = "";
+    protected String sessionId = "";
+    protected String mastershipKey = "";
+    protected String jobName;
+    protected Thread sessionTTlThread;
+    protected String checkId;
+    protected int ttlUpdateTime;
+    protected Configuration conf = Configuration.defaultConfiguration();
+    protected Configuration nullableConf = conf.addOptions(Option.DEFAULT_PATH_LEAF_TO_NULL);
 
     @Override
     public void init(String id, String jobName) {
         this.mastershipKey = id;
         this.jobName = jobName;
-        this.activeVersionKey = MasterSlaveConfigurationUtil.COMPONENT_NAME + "-version";
+        this.activeVersionKey = getActiveVersionKey();
         HostAndPort consulHostAndPort = MasterSlaveConfigurationUtil.getConsulHostAndPort(jobName);
-//        try {
         initConsul(consulHostAndPort);
-//        } catch (ConsulException e) {
-//            infiniteConnect(consulHostAndPort, jobName);
-//        }
     }
 
     private void initConsul(HostAndPort consulHostAndPort) {
@@ -264,7 +261,7 @@ public class ConsulMastershipElector implements MastershipElector {
             lockAcquired = Boolean.valueOf(responseAsString);
         }
 
-        LOGGER.info("lock acquired: {}", lockAcquired);
+        LOGGER.debug("lock acquired: {}", lockAcquired);
         return lockAcquired;
     }
 
@@ -293,5 +290,14 @@ public class ConsulMastershipElector implements MastershipElector {
         }
 
         return response;
+    }
+
+    protected String getActiveVersionKey(){
+        return MasterSlaveConfigurationUtil.COMPONENT_NAME + "-version";
+    }
+
+    @Override
+    public String getActiveVersion() {
+        return System.getenv(CcpConstants.ARTIFACT_VERSION);
     }
 }

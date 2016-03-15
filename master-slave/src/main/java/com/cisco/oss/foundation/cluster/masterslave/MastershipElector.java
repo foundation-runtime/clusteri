@@ -11,4 +11,5 @@ public interface MastershipElector {
     boolean isActiveDataCenter(String currentDataCenter);
     boolean isMaster();
     void close();
+    String getActiveVersion();
 }
