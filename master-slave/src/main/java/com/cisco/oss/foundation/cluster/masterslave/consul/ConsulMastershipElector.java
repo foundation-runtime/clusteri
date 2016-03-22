@@ -241,7 +241,7 @@ public class ConsulMastershipElector implements MastershipElector {
         if (!response.isSuccess()) {
             LOGGER.error("failed to acquire lock. got response: {}, error response: {}", response.getStatus(), responseAsString);
 
-            if (responseAsString.contains("invalid session")) {
+            if (responseAsString.contains("invalid session") || responseAsString.contains("Invalid session")) {
                 closeSession();
                 createSession();
 
