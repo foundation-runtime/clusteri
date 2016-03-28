@@ -138,7 +138,7 @@ public class ConsulMastershipElector implements MastershipElector {
                         }
                     }
                 } catch (Exception e) {
-                    LOGGER.warn("problem in heartbeat: {}", e);
+                    LOGGER.warn("problem in heartbeat: {}", e.toString());
                 }finally{
                     try {
                         TimeUnit.SECONDS.sleep(ttlUpdateTime);

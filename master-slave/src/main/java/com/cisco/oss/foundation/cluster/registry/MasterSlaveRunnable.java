@@ -98,7 +98,9 @@ public class MasterSlaveRunnable implements Runnable {
                     chooseMaster(currentVersion);
                 } catch (Exception e1) {
                     LOGGER.error("problem running master slave thread for: {}. error is: {}", jobName, e1, e1);
-                    goSlave();
+                    if (slaveNextTimeInvoke.get()) {
+                        goSlave();
+                    }
                 }
             } finally {
                 try {
