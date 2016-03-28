@@ -3,14 +3,12 @@ package com.cisco.oss.foundation.cluster.masterslave.consul;
 import com.cisco.oss.foundation.cluster.masterslave.MastershipElector;
 import com.cisco.oss.foundation.cluster.utils.MasterSlaveConfigurationUtil;
 import com.cisco.oss.foundation.configuration.CcpConstants;
-import com.cisco.oss.foundation.configuration.ConfigurationFactory;
 import com.cisco.oss.foundation.http.HttpClient;
 import com.cisco.oss.foundation.http.HttpMethod;
 import com.cisco.oss.foundation.http.HttpRequest;
 import com.cisco.oss.foundation.http.HttpResponse;
 import com.cisco.oss.foundation.http.apache.ApacheHttpClientFactory;
 import com.google.common.io.BaseEncoding;
-import com.google.common.net.HostAndPort;
 import com.jayway.jsonpath.Configuration;
 import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.Option;
@@ -19,7 +17,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Consul implementation for logic for electing new masters.
@@ -45,16 +42,16 @@ public class ConsulMastershipElector implements MastershipElector {
         this.mastershipKey = id;
         this.jobName = jobName;
         this.activeVersionKey = getActiveVersionKey();
-        HostAndPort consulHostAndPort = MasterSlaveConfigurationUtil.getConsulHostAndPort(jobName);
-        initConsul(consulHostAndPort);
+//        HostAndPort consulHostAndPort = MasterSlaveConfigurationUtil.getConsulHostAndPort(jobName);
+        initConsul();
     }
 
-    private void initConsul(HostAndPort consulHostAndPort) {
+    private void initConsul() {
 
-        ConfigurationFactory.getConfiguration().setProperty("consulClient.1.host", consulHostAndPort.getHostText());
-        ConfigurationFactory.getConfiguration().setProperty("consulClient.1.port", consulHostAndPort.getPort());
-        ConfigurationFactory.getConfiguration().setProperty("consulClient.http.waitingTime", "0");
-        ConfigurationFactory.getConfiguration().setProperty("consulClient.http.exposeStatisticsToMonitor", "false");
+//        ConfigurationFactory.getConfiguration().setProperty("consulClient.1.host", consulHostAndPort.getHostText());
+//        ConfigurationFactory.getConfiguration().setProperty("consulClient.1.port", consulHostAndPort.getPort());
+//        ConfigurationFactory.getConfiguration().setProperty("consulClient.http.waitingTime", "0");
+//        ConfigurationFactory.getConfiguration().setProperty("consulClient.http.exposeStatisticsToMonitor", "false");
         consulClient = ApacheHttpClientFactory.createHttpClient("consulClient");
 
         registerCheck();
@@ -153,6 +150,12 @@ public class ConsulMastershipElector implements MastershipElector {
         }, checkId + "Thread");
         sessionTTlThread.setDaemon(true);
         sessionTTlThread.start();
+        sessionTTlThread.setUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
+            @Override
+            public void uncaughtException(Thread t, Throwable e) {
+                LOGGER.error("Uncaught Exception for Job: {} in thread: {}. Exception is: {}",jobName, t.getName(), e);
+            }
+        });
     }
 
 

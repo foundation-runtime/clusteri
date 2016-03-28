@@ -24,6 +24,8 @@ public enum MongoClient {
 
 	INSTANCE;
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(MongoClient.class);
+
 	private Logger logger = null;
 	private static final String DATA_CENTER_COLLECTION = "dataCenter";
 	private static final int DB_RETRY_DELAY = 10;
@@ -115,10 +117,10 @@ public enum MongoClient {
 	}
 
 	private void infiniteConnect() {
-		new Thread(new Runnable() {
+		Thread reConnectThread = new Thread(new Runnable() {
 			@Override
 			public void run() {
-				while(!IS_DB_UP.get()){
+				while (!IS_DB_UP.get()) {
 					try {
 						connect();
 						IS_DB_UP.set(true);
@@ -133,7 +135,14 @@ public enum MongoClient {
 					}
 				}
 			}
-		},"Infinite-Reconnect").start();
+		}, "Infinite-Reconnect");
+		reConnectThread.start();
+		reConnectThread.setUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
+			@Override
+			public void uncaughtException(Thread t, Throwable e) {
+				LOGGER.error("Uncaught Exception in thread: {}. Exception is: {}", t.getName(), e);
+			}
+		});
 	}
 
 	/**

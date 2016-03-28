@@ -107,11 +107,11 @@ public class MasterSlaveConfigurationUtil {
         return MasterSlaveMultiplicity.newInstance(multiplicity);
     }
 
-    public static HostAndPort getConsulHostAndPort(String name) {
-        String consultHostAndPort = configuration.getString("consul.hostAndPort", "localhost:8500");
-        HostAndPort hostAndPort = HostAndPort.fromString(consultHostAndPort);
-        return hostAndPort;
-    }
+//    public static HostAndPort getConsulHostAndPort(String name) {
+//        String consultHostAndPort = configuration.getString("consul.hostAndPort", "localhost:8500");
+//        HostAndPort hostAndPort = HostAndPort.fromString(consultHostAndPort);
+//        return hostAndPort;
+//    }
 
     public static boolean isSingleAcrossMDC(String name){
         return configuration.getBoolean(name + ".masterSlave.mastership.singleAcrossMDC", true);

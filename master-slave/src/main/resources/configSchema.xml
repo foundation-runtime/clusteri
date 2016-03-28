@@ -56,5 +56,20 @@
             </DefaultValue>
         </Parameter>
 
+        <Parameter name="consulClient" description="http client for consul api" type="STRUCTURE" base="service.http.client.base">
+            <DefaultValue>
+                <StructureValue>
+                    <StructureMemberValue name="http.waitingTime" value="0"/>
+                    <StructureMemberValue name="http.exposeStatisticsToMonitor" value="false"/>
+                    <StructureMemberValue name="server">
+                        <StructureValue index="1">
+                            <StructureMemberValue name="host" value="127.0.0.1"/>
+                            <StructureMemberValue name="port" value="8500"/>
+                        </StructureValue>
+                    </StructureMemberValue>
+                </StructureValue>
+            </DefaultValue>
+        </Parameter>
+
     </NamespaceDefinition>
 </NamespaceDefinitions>

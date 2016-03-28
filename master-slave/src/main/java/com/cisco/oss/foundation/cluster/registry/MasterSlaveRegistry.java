@@ -50,13 +50,14 @@ public enum MasterSlaveRegistry {
         Thread masterSlaveThread = new Thread(new MasterSlaveRunnable(jobName, masterSlaveListener), jobName + "_MasterSlaveThread");
         masterSlaveThread.setDaemon(true);
         masterSlaveThread.start();
+
         masterSlaveThreads.put(jobName,masterSlaveThread);
         threadController.put(jobName, Boolean.TRUE);
 
         masterSlaveThread.setUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
             @Override
             public void uncaughtException(Thread t, Throwable e) {
-                LOGGER.error("Error running master slave thread for: {}. error is: {}", jobName, e, e);
+                LOGGER.error("Error running master slave thread for Job: {} . error is: {}", jobName, e, e);
             }
         });
 
