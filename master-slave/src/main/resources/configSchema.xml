@@ -57,6 +57,13 @@
         </Parameter>
 
         <Parameter name="consulClient" description="http client for consul api" type="STRUCTURE" base="service.http.client.base">
+            <StructureDefinition>
+                <StructureMemberDefinition name="numberOfInitAttempts" type="INTEGER">
+                    <DefaultValue>
+                        <PrimitiveValue value="3" />
+                    </DefaultValue>
+                </StructureMemberDefinition>
+            </StructureDefinition>
             <DefaultValue>
                 <StructureValue>
                     <StructureMemberValue name="http.waitingTime" value="0"/>
