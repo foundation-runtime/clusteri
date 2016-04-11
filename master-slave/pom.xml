@@ -106,41 +106,41 @@
                         </goals>
                         <!--<phase>process-test-classes</phase>-->
                         <phase>test-compile</phase>
-                        <configuration>
-                            <!--<port>37017</port>-->
-                            <!-- optional, default 27017 -->
+                        <!--<configuration>
+                            &lt;!&ndash;<port>37017</port>&ndash;&gt;
+                            &lt;!&ndash; optional, default 27017 &ndash;&gt;
 
-                            <!--<randomPort>true</randomPort>-->
-                            <!-- optional, default is false, if true allocates a random port and overrides embedmongo.port -->
+                            &lt;!&ndash;<randomPort>true</randomPort>&ndash;&gt;
+                            &lt;!&ndash; optional, default is false, if true allocates a random port and overrides embedmongo.port &ndash;&gt;
 
-                            <!--<version>2.0.4</version>-->
-                            <!-- optional, default 2.2.1 -->
+                            &lt;!&ndash;<version>2.0.4</version>&ndash;&gt;
+                            &lt;!&ndash; optional, default 2.2.1 &ndash;&gt;
 
-                            <!--<databaseDirectory>/tmp/mongotest</databaseDirectory>-->
-                            <!-- optional, default is a new dir in java.io.tmpdir -->
+                            &lt;!&ndash;<databaseDirectory>/tmp/mongotest</databaseDirectory>&ndash;&gt;
+                            &lt;!&ndash; optional, default is a new dir in java.io.tmpdir &ndash;&gt;
 
-                            <!--<logging>file</logging>-->
-                            <!-- optional (file|console|none), default console -->
+                            &lt;!&ndash;<logging>file</logging>&ndash;&gt;
+                            &lt;!&ndash; optional (file|console|none), default console &ndash;&gt;
 
                             ?
-                            <!-- optional, can be used when logging=file, default is ./embedmongo.log -->
+                            &lt;!&ndash; optional, can be used when logging=file, default is ./embedmongo.log &ndash;&gt;
 
-                            <!--<logFileEncoding>utf-8</logFileEncoding>-->
-                            <!-- optional, can be used when logging=file, default is utf-8 -->
+                            &lt;!&ndash;<logFileEncoding>utf-8</logFileEncoding>&ndash;&gt;
+                            &lt;!&ndash; optional, can be used when logging=file, default is utf-8 &ndash;&gt;
 
-                            <!--<bindIp>127.0.0.1</bindIp>-->
-                            <!-- optional, default is to listen on all interfaces -->
+                            &lt;!&ndash;<bindIp>127.0.0.1</bindIp>&ndash;&gt;
+                            &lt;!&ndash; optional, default is to listen on all interfaces &ndash;&gt;
 
-                            <!--<downloadPath>http://internal-mongo-repo/</downloadPath>-->
-                            <!-- optional, default is http://fastdl.mongodb.org/ -->
+                            &lt;!&ndash;<downloadPath>http://internal-mongo-repo/</downloadPath>&ndash;&gt;
+                            &lt;!&ndash; optional, default is http://fastdl.mongodb.org/ &ndash;&gt;
 
-                            <!--<storageEngine>wiredTiger</storageEngine>-->
-                            <!--optional, one of wiredTiger or mmapv1 (default is mmapv1) -->
+                            &lt;!&ndash;<storageEngine>wiredTiger</storageEngine>&ndash;&gt;
+                            &lt;!&ndash;optional, one of wiredTiger or mmapv1 (default is mmapv1) &ndash;&gt;
 
-                            <!--<skip>false</skip>-->
-                            <!-- optional, skips this plugin entirely, use on the command line like -Dembedmongo.skip -->
+                            &lt;!&ndash;<skip>false</skip>&ndash;&gt;
+                            &lt;!&ndash; optional, skips this plugin entirely, use on the command line like -Dembedmongo.skip &ndash;&gt;
 
-                        </configuration>
+                        </configuration>-->
                     </execution>
                     <!--<execution>
                         <id>mongo-import</id>

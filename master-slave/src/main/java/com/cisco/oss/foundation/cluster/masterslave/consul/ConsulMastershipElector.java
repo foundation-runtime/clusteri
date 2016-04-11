@@ -3,6 +3,7 @@ package com.cisco.oss.foundation.cluster.masterslave.consul;
 import com.cisco.oss.foundation.cluster.masterslave.MastershipElector;
 import com.cisco.oss.foundation.cluster.utils.MasterSlaveConfigurationUtil;
 import com.cisco.oss.foundation.configuration.CcpConstants;
+import com.cisco.oss.foundation.configuration.ConfigurationFactory;
 import com.cisco.oss.foundation.http.HttpClient;
 import com.cisco.oss.foundation.http.HttpMethod;
 import com.cisco.oss.foundation.http.HttpRequest;
@@ -42,22 +43,41 @@ public class ConsulMastershipElector implements MastershipElector {
         this.mastershipKey = "master-slave/" + MasterSlaveConfigurationUtil.COMPONENT_NAME + "/" + jobName;
         this.jobName = jobName;
         this.activeVersionKey = getActiveVersionKey();
-//        HostAndPort consulHostAndPort = MasterSlaveConfigurationUtil.getConsulHostAndPort(jobName);
-        initConsul();
+
+        int numberOfInitAttempts = ConfigurationFactory.getConfiguration().getInt("consulClient.numberOfInitAttempts",3);
+        boolean success = false;
+
+        for (int attemptNumber = 1; attemptNumber <= numberOfInitAttempts && !success; attemptNumber++) {
+            try {
+                initConsul();
+                success = true;
+            } catch (Exception e) {
+                if (attemptNumber != numberOfInitAttempts) {
+                    LOGGER.warn("problem initializing consul elector for: {}. Attempt: {}. Error is: {}", jobName, attemptNumber, e);
+                }else{
+                    LOGGER.error("problem initializing consul elector for: {}. Attempt: {} Failed. EXITING the application. Error is: {}", jobName, attemptNumber, e);
+                    System.exit(-1);
+                }
+                try {
+                    TimeUnit.SECONDS.sleep(1);
+                } catch (InterruptedException e1) {
+                    //ignore
+                }
+            }
+        }
     }
 
     private void initConsul() {
 
-//        ConfigurationFactory.getConfiguration().setProperty("consulClient.1.host", consulHostAndPort.getHostText());
-//        ConfigurationFactory.getConfiguration().setProperty("consulClient.1.port", consulHostAndPort.getPort());
-//        ConfigurationFactory.getConfiguration().setProperty("consulClient.http.waitingTime", "0");
-//        ConfigurationFactory.getConfiguration().setProperty("consulClient.http.exposeStatisticsToMonitor", "false");
-        consulClient = ApacheHttpClientFactory.createHttpClient("consulClient");
+        if (consulClient == null) {
+            consulClient = ApacheHttpClientFactory.createHttpClient("consulClient");
+        }
 
         registerCheck();
 
-
-        startSessionHeartbeatThread(ttlUpdateTime);
+        if (sessionTTlThread == null) {
+            startSessionHeartbeatThread(ttlUpdateTime);
+        }
         try {
             TimeUnit.SECONDS.sleep(2);
         } catch (InterruptedException e) {
