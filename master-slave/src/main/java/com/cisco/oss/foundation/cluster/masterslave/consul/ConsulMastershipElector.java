@@ -25,7 +25,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class ConsulMastershipElector implements MastershipElector {
 
-    public static final String ACTIVE_DATACENTER = "activeDatacenter";
+    public static final String ACTIVE_DATACENTER = "primaryDatacenter";
     private static final Logger LOGGER = LoggerFactory.getLogger(ConsulMastershipElector.class);
     protected HttpClient consulClient;
     protected String activeVersionKey = "";
@@ -47,9 +47,17 @@ public class ConsulMastershipElector implements MastershipElector {
         int numberOfInitAttempts = ConfigurationFactory.getConfiguration().getInt("consulClient.numberOfInitAttempts",3);
         boolean success = false;
 
+        int ttlPeriod = MasterSlaveConfigurationUtil.getMasterSlaveLeaseTime(jobName);
+
+        try {
+            TimeUnit.SECONDS.sleep(ttlPeriod);
+        } catch (InterruptedException e) {
+            //ignore
+        }
+
         for (int attemptNumber = 1; attemptNumber <= numberOfInitAttempts && !success; attemptNumber++) {
             try {
-                initConsul();
+                initConsul(ttlPeriod);
                 success = true;
             } catch (Exception e) {
                 if (attemptNumber != numberOfInitAttempts) {
@@ -67,16 +75,16 @@ public class ConsulMastershipElector implements MastershipElector {
         }
     }
 
-    private void initConsul() {
+    private void initConsul(int ttlPeriod) {
 
         if (consulClient == null) {
             consulClient = ApacheHttpClientFactory.createHttpClient("consulClient");
         }
 
-        registerCheck();
+        registerCheck(ttlPeriod);
 
         if (sessionTTlThread == null) {
-            startSessionHeartbeatThread(ttlUpdateTime);
+            startSessionHeartbeatThread(ttlUpdateTime, ttlPeriod);
         }
         try {
             TimeUnit.SECONDS.sleep(2);
@@ -87,9 +95,9 @@ public class ConsulMastershipElector implements MastershipElector {
         createSession();
     }
 
-    private void registerCheck() {
+    private void registerCheck(int ttlPeriod) {
         checkId = mastershipKey + "-TTLCheck";
-        int ttlPeriod = MasterSlaveConfigurationUtil.getMasterSlaveLeaseTime(jobName);
+
         ttlUpdateTime = ttlPeriod / 3;
 
         String ttlCheck = "{\n" +
@@ -139,7 +147,7 @@ public class ConsulMastershipElector implements MastershipElector {
         LOGGER.info("new Session Id is: {}", sessionId);
     }
 
-    private void startSessionHeartbeatThread(int ttlUpdateTime) {
+    private void startSessionHeartbeatThread(int ttlUpdateTime, int ttlPeriod) {
         sessionTTlThread = new Thread(() -> {
             while (true) {
                 try {
@@ -154,7 +162,7 @@ public class ConsulMastershipElector implements MastershipElector {
                         String passCheckResponse = response.getResponseAsString();
                         LOGGER.error("failed to pass check. got response: {}, error response: {}", response.getStatus(), passCheckResponse);
                         if(StringUtils.isNotEmpty(passCheckResponse) && passCheckResponse.contains("CheckID does not have associated TTL")){
-                            registerCheck();
+                            registerCheck(ttlPeriod);
                         }
                     }
                 } catch (Exception e) {
