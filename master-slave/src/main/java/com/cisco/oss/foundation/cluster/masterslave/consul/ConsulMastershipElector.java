@@ -77,6 +77,14 @@ public class ConsulMastershipElector implements MastershipElector {
 
     private void initConsul(int ttlPeriod) {
 
+        int ttlPeriod = MasterSlaveConfigurationUtil.getMasterSlaveLeaseTime(jobName);
+
+        try {
+            TimeUnit.SECONDS.sleep(ttlPeriod);
+        } catch (InterruptedException e) {
+            //ignore
+        }
+
         if (consulClient == null) {
             consulClient = ApacheHttpClientFactory.createHttpClient("consulClient");
         }
