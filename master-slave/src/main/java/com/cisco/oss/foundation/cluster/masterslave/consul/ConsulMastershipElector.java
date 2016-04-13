@@ -33,8 +33,9 @@ public class ConsulMastershipElector implements MastershipElector {
     protected String mastershipKey = "";
     protected String jobName;
     protected Thread sessionTTlThread;
-    protected String checkId;
+//    protected String checkId;
     protected int ttlUpdateTime;
+    protected int ttlPeriod;
     protected Configuration conf = Configuration.defaultConfiguration();
     protected Configuration nullableConf = conf.addOptions(Option.DEFAULT_PATH_LEAF_TO_NULL);
 
@@ -47,17 +48,22 @@ public class ConsulMastershipElector implements MastershipElector {
         int numberOfInitAttempts = ConfigurationFactory.getConfiguration().getInt("consulClient.numberOfInitAttempts",3);
         boolean success = false;
 
-        int ttlPeriod = MasterSlaveConfigurationUtil.getMasterSlaveLeaseTime(jobName);
-
-        try {
-            TimeUnit.SECONDS.sleep(ttlPeriod);
-        } catch (InterruptedException e) {
-            //ignore
+        ttlPeriod = MasterSlaveConfigurationUtil.getMasterSlaveLeaseTime(jobName);
+        if(ttlPeriod < 10){
+            LOGGER.error("Lease time must be at least 10 seconds. For {} the value is: {}. Exiting the application", jobName, ttlPeriod);
+            System.exit(-1);
         }
+        ttlUpdateTime = ttlPeriod / 3;
+
+//        try {
+//            TimeUnit.SECONDS.sleep(ttlPeriod);
+//        } catch (InterruptedException e) {
+//            //ignore
+//        }
 
         for (int attemptNumber = 1; attemptNumber <= numberOfInitAttempts && !success; attemptNumber++) {
             try {
-                initConsul(ttlPeriod);
+                initConsul();
                 success = true;
             } catch (Exception e) {
                 if (attemptNumber != numberOfInitAttempts) {
@@ -75,47 +81,36 @@ public class ConsulMastershipElector implements MastershipElector {
         }
     }
 
-    private void initConsul(int ttlPeriod) {
+    private void initConsul() {
 
         if (consulClient == null) {
             consulClient = ApacheHttpClientFactory.createHttpClient("consulClient");
         }
 
-        registerCheck(ttlPeriod);
-
-        if (sessionTTlThread == null) {
-            startSessionHeartbeatThread(ttlUpdateTime, ttlPeriod);
-        }
-        try {
-            TimeUnit.SECONDS.sleep(2);
-        } catch (InterruptedException e) {
-            //ignore
-        }
-
         createSession();
     }
 
-    private void registerCheck(int ttlPeriod) {
-        checkId = mastershipKey + "-TTLCheck";
-
-        ttlUpdateTime = ttlPeriod / 3;
-
-        String ttlCheck = "{\n" +
-                "    \"ID\": \"" + checkId + "\",\n" +
-                "    \"Name\": \"" + mastershipKey + " Status\",\n" +
-                "    \"Notes\": \"background process does a curl internally every " + ttlUpdateTime + " seconds\",\n" +
-                "    \"TTL\": \"" + ttlPeriod + "s\"\n" +
-                "}";
-
-        HttpRequest registerCheck = HttpRequest.newBuilder()
-                .httpMethod(HttpMethod.PUT)
-                .uri("/v1/agent/check/register")
-                .entity(ttlCheck)
-                .build();
-
-        execute(registerCheck,true,"register health check");
-
-    }
+//    private void registerCheck() {
+//        checkId = mastershipKey + "-TTLCheck";
+//
+//        ttlUpdateTime = ttlPeriod / 3;
+//
+//        String ttlCheck = "{\n" +
+//                "    \"ID\": \"" + checkId + "\",\n" +
+//                "    \"Name\": \"" + mastershipKey + " Status\",\n" +
+//                "    \"Notes\": \"background process does a curl internally every " + ttlUpdateTime + " seconds\",\n" +
+//                "    \"TTL\": \"" + ttlPeriod + "s\"\n" +
+//                "}";
+//
+//        HttpRequest registerCheck = HttpRequest.newBuilder()
+//                .httpMethod(HttpMethod.PUT)
+//                .uri("/v1/agent/check/register")
+//                .entity(ttlCheck)
+//                .build();
+//
+//        execute(registerCheck,true,"register health check");
+//
+//    }
 
     private void closeSession() {
 
@@ -131,7 +126,7 @@ public class ConsulMastershipElector implements MastershipElector {
 
         String body = "{\n" +
                 "  \"Name\": \"" + MasterSlaveConfigurationUtil.INSTANCE_ID + "\",\n" +
-                "  \"Checks\": [\"" + checkId + "\", \"serfHealth\"]\n" +
+                "\"TTL\": \""+ttlPeriod+"s\"" +
                 "}";
 
         HttpRequest createSession = HttpRequest.newBuilder()
@@ -145,25 +140,34 @@ public class ConsulMastershipElector implements MastershipElector {
         String jsonId = response.getResponseAsString();
         this.sessionId = JsonPath.parse(jsonId).read("$.ID");
         LOGGER.info("new Session Id is: {}", sessionId);
+
+        if (sessionTTlThread == null) {
+            startSessionHeartbeatThread();
+        }
+        try {
+            TimeUnit.SECONDS.sleep(2);
+        } catch (InterruptedException e) {
+            //ignore
+        }
     }
 
-    private void startSessionHeartbeatThread(int ttlUpdateTime, int ttlPeriod) {
+    private void startSessionHeartbeatThread() {
         sessionTTlThread = new Thread(() -> {
             while (true) {
                 try {
-                    HttpRequest passCheck = HttpRequest.newBuilder()
-                            .httpMethod(HttpMethod.GET)
-                            .uri("/v1/agent/check/pass/" + checkId)
+                    HttpRequest renewSession = HttpRequest.newBuilder()
+                            .httpMethod(HttpMethod.PUT)
+                            .uri("/v1/session/renew/" + sessionId)
                             .silentLogging()
                             .build();
 
-                    HttpResponse response = consulClient.execute(passCheck);
+                    HttpResponse response = consulClient.execute(renewSession);
                     if (!response.isSuccess()) {
-                        String passCheckResponse = response.getResponseAsString();
-                        LOGGER.error("failed to pass check. got response: {}, error response: {}", response.getStatus(), passCheckResponse);
-                        if(StringUtils.isNotEmpty(passCheckResponse) && passCheckResponse.contains("CheckID does not have associated TTL")){
-                            registerCheck(ttlPeriod);
-                        }
+                        String renewSessionResponse = response.getResponseAsString();
+                        LOGGER.error("failed to pass check. got response: {}, error response: {}", response.getStatus(), renewSessionResponse);
+//                        if(StringUtils.isNotEmpty(renewSessionResponse) && renewSessionResponse.contains("CheckID does not have associated TTL")){
+//                            registerCheck(ttlPeriod);
+//                        }
                     }
                 } catch (Exception e) {
                     LOGGER.warn("problem in heartbeat: {}", e.toString());
@@ -175,7 +179,7 @@ public class ConsulMastershipElector implements MastershipElector {
                     }
                 }
             }
-        }, checkId + "Thread");
+        }, jobName + "-SessionRenewThread");
         sessionTTlThread.setDaemon(true);
         sessionTTlThread.start();
         sessionTTlThread.setUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
