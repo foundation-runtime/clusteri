@@ -37,10 +37,10 @@ public enum MongoClient {
 
     private MongoCollection masterSlave;
 
-	private String mongoUserName = "";
-	private String mongoPassword = "";
+	private static String mongoUserName = "";
+	private static String mongoPassword = "";
 
-	boolean isAuthenticationEnabled = false;
+	private static boolean isAuthenticationEnabled = false;
 
     MongoClient() {
 
@@ -63,7 +63,7 @@ public enum MongoClient {
 	 * @param user the db user
 	 * @param password teh db pasword
      */
-	public void enableAuthentication(String user, String password){
+	public static void enableAuthentication(String user, String password){
 
 		if(StringUtils.isBlank(user)){
 			throw new IllegalArgumentException("mongo user can't be null or empty");
