@@ -37,10 +37,8 @@ public enum MongoClient {
 
     private MongoCollection masterSlave;
 
-	private String mongoUserName = "";
-	private String mongoPassword = "";
 
-	boolean isAuthenticationEnabled = false;
+
 
     MongoClient() {
 
@@ -58,25 +56,6 @@ public enum MongoClient {
 		masterSlave		= database.getCollection(MASTER_SLAVE_COLLECTION);
 	}
 
-	/**
-	 * call this method first if you want to enable authenticated mongo db access
-	 * @param user the db user
-	 * @param password teh db pasword
-     */
-	public void enableAuthentication(String user, String password){
-
-		if(StringUtils.isBlank(user)){
-			throw new IllegalArgumentException("mongo user can't be null or empty");
-		}
-
-		if(StringUtils.isBlank(password)){
-			throw new IllegalArgumentException("mongo password can't be null or empty");
-		}
-
-		isAuthenticationEnabled = true;
-		mongoUserName = user;
-		mongoPassword = password;
-	}
 
 	private MongoDatabase connect(){
 		MongoClientConfiguration config = new MongoClientConfiguration();
@@ -88,11 +67,12 @@ public enum MongoClient {
 
     	String dbName = MasterSlaveConfigurationUtil.getMongodbName();
     	
-		if (isAuthenticationEnabled) {
+		if (MasterSlaveConfigurationUtil.isMongoAuthenticationEnabled()) {
 
 			Builder credentials = new Builder();
-			credentials.userName(mongoUserName);
-			credentials.password(mongoPassword.toCharArray());
+			Pair<String, String> mongoUserCredentials = MasterSlaveConfigurationUtil.getMongoUserCredentials();
+			credentials.userName(mongoUserCredentials.getLeft());
+			credentials.password(mongoUserCredentials.getRight().toCharArray());
 			credentials.setDatabase(dbName);
 			
 			config.addCredential(credentials);

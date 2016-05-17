@@ -2,7 +2,6 @@ package com.cisco.oss.foundation.cluster.utils;
 
 import com.cisco.oss.foundation.cluster.mongo.MissingMongoConfigException;
 import com.cisco.oss.foundation.configuration.CcpConstants;
-import com.google.common.net.HostAndPort;
 import org.apache.commons.configuration.Configuration;
 
 import com.cisco.oss.foundation.configuration.ConfigurationFactory;
@@ -34,9 +33,14 @@ public class MasterSlaveConfigurationUtil {
 
     private final static List<Pair<String, Integer>> mongodbServers = new ArrayList<>();
 
+    private static String mongoUserName = "";
+    private static String mongoPassword = "";
+    private static boolean isMongoAuthenticationEnabled = false;
+
     /**
      * When set to read mongo servers from configuration you can override the configuration prefix using this method.
      * If called with emppty or null prefix, the default will be used
+     *
      * @param mongodbServerConfigPrefix - the new prefix. default is: 'mongodb'.
      */
     public static void setMongodbServerConfigPrefix(String mongodbServerConfigPrefix) {
@@ -49,6 +53,7 @@ public class MasterSlaveConfigurationUtil {
 
     /**
      * Use this API if you want to external set the mongo servers list and prevent the lib from fetching the info from configuration
+     *
      * @param mongodbServers
      */
     public static void setMongodbServers(List<Pair<String, Integer>> mongodbServers) {
@@ -58,11 +63,12 @@ public class MasterSlaveConfigurationUtil {
 
     /**
      * read pairs of host and port from configuration.
+     *
      * @return List of Pairs. Each pair contains host and port.
      */
     public static List<Pair<String, Integer>> getMongodbServers() {
 
-        if(mongodbServers.isEmpty()){
+        if (mongodbServers.isEmpty()) {
             Iterator<String> keys = configuration.getKeys();
             while (keys.hasNext()) {
                 String key = keys.next();
@@ -71,16 +77,45 @@ public class MasterSlaveConfigurationUtil {
                     String index = matcher.group(1);
                     String host = configuration.getString(key);
                     Integer port = configuration.getInt(mongodbServerConfigPrefix + "." + index + ".port");
-                    mongodbServers.add(Pair.of(host,port));
+                    mongodbServers.add(Pair.of(host, port));
                 }
             }
         }
 
-        if(mongodbServers.isEmpty()){
+        if (mongodbServers.isEmpty()) {
             throw new MissingMongoConfigException("missing mongo db configuration. you have to define at least one array memeber for 'mongodb.<index>.host' and 'mongodb.<index>.port'");
         }
 
         return mongodbServers;
+    }
+
+    /**
+     * call this method first if you want to enable authenticated mongo db access
+     *
+     * @param user     the db user
+     * @param password teh db pasword
+     */
+    public static void enableAuthentication(String user, String password) {
+
+        if (StringUtils.isBlank(user)) {
+            throw new IllegalArgumentException("mongo user can't be null or empty");
+        }
+
+        if (StringUtils.isBlank(password)) {
+            throw new IllegalArgumentException("mongo password can't be null or empty");
+        }
+
+        isMongoAuthenticationEnabled = true;
+        mongoUserName = user;
+        mongoPassword = password;
+    }
+
+    public static boolean isMongoAuthenticationEnabled() {
+        return isMongoAuthenticationEnabled;
+    }
+
+    public static Pair<String, String> getMongoUserCredentials() {
+        return Pair.of(mongoUserName, mongoPassword);
     }
 
     public static String getMasterSlaveImpl() {
@@ -113,11 +148,11 @@ public class MasterSlaveConfigurationUtil {
 //        return hostAndPort;
 //    }
 
-    public static boolean isSingleAcrossMDC(String name){
+    public static boolean isSingleAcrossMDC(String name) {
         return configuration.getBoolean(name + ".masterSlave.mastership.singleAcrossMDC", true);
     }
 
-    public static boolean isSingleAcrossVersion(String name){
+    public static boolean isSingleAcrossVersion(String name) {
         return configuration.getBoolean(name + ".masterSlave.mastership.singleAcrossVersion", true);
     }
 
