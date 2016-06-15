@@ -218,7 +218,7 @@ public class ConsulMastershipElector implements MastershipElector {
 
         HttpResponse response = consulClient.execute(getActiveKey);
         if (!response.isSuccess()) {
-            LOGGER.debug("failed to get value from KV store. got response: {}, error response: {}", response.getStatus(), response.getResponseAsString());
+            LOGGER.debug("failed to get value from KV store for key: {}. got response: {}, error response: {}", key, response.getStatus(), response.getResponseAsString());
         }else{
             String jsonKeyValue = response.getResponseAsString();
             String valueInBase64 = JsonPath.parse(jsonKeyValue).read("$.[0].Value");
@@ -274,7 +274,7 @@ public class ConsulMastershipElector implements MastershipElector {
         HttpResponse response = consulClient.execute(acquireLock);
         String responseAsString = response.getResponseAsString();
         if (!response.isSuccess()) {
-            LOGGER.error("failed to acquire lock. got response: {}, error response: {}", response.getStatus(), responseAsString);
+            LOGGER.error("failed to acquire lock for key: {}. got response: {}, error response: {}", mastershipKey, response.getStatus(), responseAsString);
 
             if (responseAsString.contains("invalid session") || responseAsString.contains("Invalid session")) {
                 closeSession();
