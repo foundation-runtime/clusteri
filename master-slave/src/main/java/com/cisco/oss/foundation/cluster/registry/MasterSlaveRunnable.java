@@ -104,7 +104,7 @@ public class MasterSlaveRunnable implements Runnable {
                 }
             } finally {
                 try {
-                    TimeUnit.MILLISECONDS.sleep(masterSlaveLeaseTime * 1000);
+                    TimeUnit.MILLISECONDS.sleep(masterSlaveLeaseTime * 1000/2);
                 } catch (InterruptedException e) {
                     //ignore
                 }

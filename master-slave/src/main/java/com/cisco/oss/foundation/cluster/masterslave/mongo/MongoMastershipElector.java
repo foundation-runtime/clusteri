@@ -6,6 +6,7 @@ import com.allanbank.mongodb.bson.Element;
 import com.allanbank.mongodb.bson.builder.DocumentBuilder;
 import com.allanbank.mongodb.bson.builder.impl.DocumentBuilderImpl;
 import com.allanbank.mongodb.builder.ConditionBuilder;
+import com.allanbank.mongodb.builder.Find;
 import com.allanbank.mongodb.builder.QueryBuilder;
 import com.cisco.oss.foundation.cluster.masterslave.MastershipElector;
 import com.cisco.oss.foundation.cluster.mongo.MongoClient;
@@ -95,13 +96,22 @@ public class MongoMastershipElector implements MastershipElector {
         documentbuilder.add(LEASE_RENEWED, leaseRenewed);
         document = documentbuilder.build();
 
+//        long lastExpectedLeaseUpdateTime = leaseRenewed - masterSlaveLeaseTime * 1000;
+//        ConditionBuilder timeQuery = QueryBuilder.where(LEASE_RENEWED).lessThanOrEqualTo(lastExpectedLeaseUpdateTime);
         long lastExpectedLeaseUpdateTime = leaseRenewed - masterSlaveLeaseTime * 1000;
-        ConditionBuilder timeQuery = QueryBuilder.where(LEASE_RENEWED).lessThanOrEqualTo(lastExpectedLeaseUpdateTime);
-        Document updateLeaseQuery = QueryBuilder.and(QueryBuilder.where(ID).equals(this.id), timeQuery);
+
+        ConditionBuilder instanceIdEqaulity = QueryBuilder.where(MASTER_INSTANCE_ID).equals(MasterSlaveConfigurationUtil.INSTANCE_ID);
+        ConditionBuilder leaseCondition = QueryBuilder.where(LEASE_RENEWED).greaterThan(lastExpectedLeaseUpdateTime);
+
+        Document first = QueryBuilder.and(instanceIdEqaulity, leaseCondition);
+        ConditionBuilder second = QueryBuilder.where(LEASE_RENEWED).lessThanOrEqualTo(lastExpectedLeaseUpdateTime);
+
+        Document query = QueryBuilder.or(first, second);
+        Document updateLeaseQuery = QueryBuilder.and(QueryBuilder.where(ID).equals(this.id), query);
 
         LOGGER.trace("id: {}, leaseRenewed: {}, lease-time: {}, lastExpectedLeaseUpdateTime: {}", id, leaseRenewed, masterSlaveLeaseTime, lastExpectedLeaseUpdateTime);
 //                    long numOfRowsUpdated = masterSlaveCollection.update(updateLeaseQuery, document,false, true);
-        long numOfRowsUpdated = masterSlaveCollection.update(updateLeaseQuery, document);
+        long numOfRowsUpdated = masterSlaveCollection.update(updateLeaseQuery, this.document);
 
         return numOfRowsUpdated > 0;
     }
