@@ -216,6 +216,9 @@ public class ConsulMastershipElector implements MastershipElector {
                 .silentLogging()
                 .build();
 
+        boolean isActive = true;
+        String consulValue="";
+
         HttpResponse response = consulClient.execute(getActiveKey);
         if (!response.isSuccess()) {
             LOGGER.debug("failed to get value from KV store for key: {}. got response: {}, error response: {}", key, response.getStatus(), response.getResponseAsString());
@@ -224,12 +227,14 @@ public class ConsulMastershipElector implements MastershipElector {
             String valueInBase64 = JsonPath.parse(jsonKeyValue).read("$.[0].Value");
 
             if(StringUtils.isNotEmpty(valueInBase64)){
-                String value = new String(BaseEncoding.base64().decode(valueInBase64));
-                return currentValue.equals(value);
+                consulValue = new String(BaseEncoding.base64().decode(valueInBase64));
+                isActive =  currentValue.equals(consulValue);
             }
         }
-//
-        return true;
+
+        LOGGER.debug("isActive: {}, env value: {}, consul key: {}, consul value: {}", currentValue, key, consulValue);
+
+        return isActive;
     }
 
     @Override
