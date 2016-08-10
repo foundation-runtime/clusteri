@@ -283,13 +283,16 @@ public class ConsulMastershipElector implements MastershipElector {
     }
 
     private void releaseLock() {
+        LOGGER.trace("going to release lock");
         HttpRequest releaseLock = HttpRequest.newBuilder()
                 .httpMethod(HttpMethod.PUT)
                 .uri("/v1/kv/" + mastershipKey)
                 .queryParams("release", sessionId)
                 .build();
 
-        execute(releaseLock, false, "release lock");
+        HttpResponse response = execute(releaseLock, false, "release lock");
+        LOGGER.trace("release lock response: " + response.getStatus());
+
     }
 
     private HttpResponse execute(HttpRequest request, boolean throwOnError, String opName) {
