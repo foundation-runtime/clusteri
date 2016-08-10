@@ -192,17 +192,20 @@ public class MasterSlaveRunnable implements Runnable {
 
 
     public void goMaster() {
-        LOGGER.info("{} is now master", MasterSlaveConfigurationUtil.INSTANCE_ID);
+        LOGGER.debug("{} is going to turn into master", MasterSlaveConfigurationUtil.INSTANCE_ID);
         masterNextTimeInvoke.set(Boolean.FALSE);
         slaveNextTimeInvoke.set(Boolean.TRUE);
         masterSlaveListener.goMaster();
+        LOGGER.info("{} is now master", MasterSlaveConfigurationUtil.INSTANCE_ID);
     }
 
     public void goSlave() {
-        LOGGER.info("{} is now slave", MasterSlaveConfigurationUtil.INSTANCE_ID);
+        LOGGER.debug("{} is going to turn into slave", MasterSlaveConfigurationUtil.INSTANCE_ID);
         slaveNextTimeInvoke.set(Boolean.FALSE);
         masterNextTimeInvoke.set(Boolean.TRUE);
+        mastershipElector.cleanupMaster();
         masterSlaveListener.goSlave();
+        LOGGER.info("{} is now slave", MasterSlaveConfigurationUtil.INSTANCE_ID);
     }
 
     private boolean isActiveDC() {
