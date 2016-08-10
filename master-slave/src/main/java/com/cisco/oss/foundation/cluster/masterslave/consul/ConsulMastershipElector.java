@@ -33,7 +33,7 @@ public class ConsulMastershipElector implements MastershipElector {
     protected String mastershipKey = "";
     protected String jobName;
     protected Thread sessionTTlThread;
-//    protected String checkId;
+    //    protected String checkId;
     protected int ttlUpdateTime;
     protected int ttlPeriod;
     protected Configuration conf = Configuration.defaultConfiguration();
@@ -45,21 +45,15 @@ public class ConsulMastershipElector implements MastershipElector {
         this.jobName = jobName;
         this.activeVersionKey = getActiveVersionKey();
 
-        int numberOfInitAttempts = ConfigurationFactory.getConfiguration().getInt("consulClient.numberOfInitAttempts",3);
+        int numberOfInitAttempts = ConfigurationFactory.getConfiguration().getInt("consulClient.numberOfInitAttempts", 3);
         boolean success = false;
 
         ttlPeriod = MasterSlaveConfigurationUtil.getMasterSlaveLeaseTime(jobName);
-        if(ttlPeriod < 10){
+        if (ttlPeriod < 10) {
             LOGGER.error("Lease time must be at least 10 seconds. For {} the value is: {}. Exiting the application", jobName, ttlPeriod);
             System.exit(-1);
         }
         ttlUpdateTime = ttlPeriod / 3;
-
-//        try {
-//            TimeUnit.SECONDS.sleep(ttlPeriod);
-//        } catch (InterruptedException e) {
-//            //ignore
-//        }
 
         for (int attemptNumber = 1; attemptNumber <= numberOfInitAttempts && !success; attemptNumber++) {
             try {
@@ -68,7 +62,7 @@ public class ConsulMastershipElector implements MastershipElector {
             } catch (Exception e) {
                 if (attemptNumber != numberOfInitAttempts) {
                     LOGGER.warn("problem initializing consul elector for: {}. Attempt: {}. Error is: {}", jobName, attemptNumber, e);
-                }else{
+                } else {
                     LOGGER.error("problem initializing consul elector for: {}. Attempt: {} Failed. EXITING the application. Error is: {}", jobName, attemptNumber, e);
                     System.exit(-1);
                 }
@@ -90,28 +84,6 @@ public class ConsulMastershipElector implements MastershipElector {
         createSession();
     }
 
-//    private void registerCheck() {
-//        checkId = mastershipKey + "-TTLCheck";
-//
-//        ttlUpdateTime = ttlPeriod / 3;
-//
-//        String ttlCheck = "{\n" +
-//                "    \"ID\": \"" + checkId + "\",\n" +
-//                "    \"Name\": \"" + mastershipKey + " Status\",\n" +
-//                "    \"Notes\": \"background process does a curl internally every " + ttlUpdateTime + " seconds\",\n" +
-//                "    \"TTL\": \"" + ttlPeriod + "s\"\n" +
-//                "}";
-//
-//        HttpRequest registerCheck = HttpRequest.newBuilder()
-//                .httpMethod(HttpMethod.PUT)
-//                .uri("/v1/agent/check/register")
-//                .entity(ttlCheck)
-//                .build();
-//
-//        execute(registerCheck,true,"register health check");
-//
-//    }
-
     private void closeSession() {
 
         HttpRequest destroySession = HttpRequest.newBuilder()
@@ -119,14 +91,14 @@ public class ConsulMastershipElector implements MastershipElector {
                 .uri("/v1/session/destroy/" + sessionId)
                 .build();
 
-        execute(destroySession,false,"destroy session");
+        execute(destroySession, false, "destroy session");
     }
 
     private void createSession() {
 
         String body = "{\n" +
                 "  \"Name\": \"" + MasterSlaveConfigurationUtil.INSTANCE_ID + "\",\n" +
-                "\"TTL\": \""+ttlPeriod+"s\"" +
+                "\"TTL\": \"" + ttlPeriod + "s\"" +
                 "}";
 
         HttpRequest createSession = HttpRequest.newBuilder()
@@ -165,13 +137,10 @@ public class ConsulMastershipElector implements MastershipElector {
                     if (!response.isSuccess()) {
                         String renewSessionResponse = response.getResponseAsString();
                         LOGGER.error("failed to pass check. got response: {}, error response: {}", response.getStatus(), renewSessionResponse);
-//                        if(StringUtils.isNotEmpty(renewSessionResponse) && renewSessionResponse.contains("CheckID does not have associated TTL")){
-//                            registerCheck(ttlPeriod);
-//                        }
                     }
                 } catch (Exception e) {
                     LOGGER.warn("problem in heartbeat: {}", e.toString());
-                }finally{
+                } finally {
                     try {
                         TimeUnit.SECONDS.sleep(ttlUpdateTime);
                     } catch (InterruptedException e) {
@@ -185,7 +154,7 @@ public class ConsulMastershipElector implements MastershipElector {
         sessionTTlThread.setUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
             @Override
             public void uncaughtException(Thread t, Throwable e) {
-                LOGGER.error("Uncaught Exception for Job: {} in thread: {}. Exception is: {}",jobName, t.getName(), e);
+                LOGGER.error("Uncaught Exception for Job: {} in thread: {}. Exception is: {}", jobName, t.getName(), e);
             }
         });
     }
@@ -200,7 +169,7 @@ public class ConsulMastershipElector implements MastershipElector {
                 .build();
 
 
-        HttpResponse response = execute(ping,false,"ping agent");
+        HttpResponse response = execute(ping, false, "ping agent");
 
         return response.isSuccess();
 
@@ -217,22 +186,22 @@ public class ConsulMastershipElector implements MastershipElector {
                 .build();
 
         boolean isActive = true;
-        String consulValue="";
+        String consulValue = "";
 
         HttpResponse response = consulClient.execute(getActiveKey);
         if (!response.isSuccess()) {
             LOGGER.debug("failed to get value from KV store for key: {}. got response: {}, error response: {}", key, response.getStatus(), response.getResponseAsString());
-        }else{
+        } else {
             String jsonKeyValue = response.getResponseAsString();
             String valueInBase64 = JsonPath.parse(jsonKeyValue).read("$.[0].Value");
 
-            if(StringUtils.isNotEmpty(valueInBase64)){
+            if (StringUtils.isNotEmpty(valueInBase64)) {
                 consulValue = new String(BaseEncoding.base64().decode(valueInBase64));
-                isActive =  currentValue.equals(consulValue);
+                isActive = currentValue.equals(consulValue);
             }
         }
 
-        LOGGER.debug("isActive: {}, env value: {}, consul key: {}, consul value: {}", currentValue, key, consulValue);
+        LOGGER.debug("isActive: {}, env value: {}, consul key: {}, consul value: {}", isActive, currentValue, key, consulValue);
 
         return isActive;
     }
@@ -293,11 +262,11 @@ public class ConsulMastershipElector implements MastershipElector {
                         .build();
 
                 HttpResponse acquireLockRetryResponse = execute(acquireLock, false, "acquire lock");
-                if(acquireLockRetryResponse.isSuccess()){
+                if (acquireLockRetryResponse.isSuccess()) {
                     lockAcquired = Boolean.valueOf(acquireLockRetryResponse.getResponseAsString());
                 }
             }
-        }else{
+        } else {
             lockAcquired = Boolean.valueOf(responseAsString);
         }
 
@@ -308,36 +277,52 @@ public class ConsulMastershipElector implements MastershipElector {
     @Override
     public void close() {
         if (consulClient != null) {
-            HttpRequest releaseLock = HttpRequest.newBuilder()
-                    .httpMethod(HttpMethod.PUT)
-                    .uri("/v1/kv/" + mastershipKey)
-                    .queryParams("release", sessionId)
-                    .build();
-
-            execute(releaseLock,false,"release lock");
+            releaseLock();
             closeSession();
         }
     }
 
-    private HttpResponse execute(HttpRequest request, boolean throwOnError, String opName){
+    private void releaseLock() {
+        LOGGER.trace("going to release lock");
+        HttpRequest releaseLock = HttpRequest.newBuilder()
+                .httpMethod(HttpMethod.PUT)
+                .uri("/v1/kv/" + mastershipKey)
+                .queryParams("release", sessionId)
+                .build();
+
+        HttpResponse response = execute(releaseLock, false, "release lock");
+        LOGGER.trace("release lock response: " + response.getStatus());
+
+    }
+
+    private HttpResponse execute(HttpRequest request, boolean throwOnError, String opName) {
         HttpResponse response = consulClient.execute(request);
         String responseAsString = response.getResponseAsString();
         if (!response.isSuccess()) {
-            LOGGER.error("failed to "+opName+". got response: {}, error response: {}", response.getStatus(), responseAsString);
-            if(throwOnError){
-                throw new ConsulException("failed to "+opName+". status: " + response.getStatus());
+            LOGGER.error("failed to " + opName + ". got response: {}, error response: {}", response.getStatus(), responseAsString);
+            if (throwOnError) {
+                throw new ConsulException("failed to " + opName + ". status: " + response.getStatus());
             }
         }
 
         return response;
     }
 
-    protected String getActiveVersionKey(){
+    protected String getActiveVersionKey() {
         return MasterSlaveConfigurationUtil.COMPONENT_NAME + "-version";
     }
 
     @Override
     public String getActiveVersion() {
         return System.getenv(CcpConstants.ARTIFACT_VERSION);
+    }
+
+    @Override
+    public void cleanupMaster() {
+        try {
+            releaseLock();
+        } catch (Exception e) {
+            LOGGER.error("instance is turning into slave but can't release lock. error: {}", e);
+        }
     }
 }

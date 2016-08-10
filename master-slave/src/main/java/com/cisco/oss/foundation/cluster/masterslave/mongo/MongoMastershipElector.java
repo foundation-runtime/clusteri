@@ -140,4 +140,9 @@ public class MongoMastershipElector implements MastershipElector {
     public String getActiveVersion() {
         return System.getenv(CcpConstants.ARTIFACT_VERSION);
     }
+
+    @Override
+    public void cleanupMaster() {
+
+    }
 }

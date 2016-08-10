@@ -12,4 +12,5 @@ public interface MastershipElector {
     boolean isMaster();
     void close();
     String getActiveVersion();
+    void cleanupMaster();
 }
