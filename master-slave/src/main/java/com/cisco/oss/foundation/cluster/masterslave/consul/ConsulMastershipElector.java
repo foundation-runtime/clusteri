@@ -201,7 +201,7 @@ public class ConsulMastershipElector implements MastershipElector {
             }
         }
 
-        LOGGER.debug("isActive: {}, env value: {}, consul key: {}, consul value: {}", currentValue, key, consulValue);
+        LOGGER.debug("isActive: {}, env value: {}, consul key: {}, consul value: {}", isActive, currentValue, key, consulValue);
 
         return isActive;
     }
