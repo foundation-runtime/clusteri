@@ -202,6 +202,7 @@ public class MasterSlaveRunnable implements Runnable {
         LOGGER.info("{} is now slave", MasterSlaveConfigurationUtil.INSTANCE_ID);
         slaveNextTimeInvoke.set(Boolean.FALSE);
         masterNextTimeInvoke.set(Boolean.TRUE);
+        mastershipElector.cleanupMaster();
         masterSlaveListener.goSlave();
     }
 
