@@ -94,7 +94,7 @@ public class ConsulMastershipElector implements MastershipElector {
         execute(destroySession, false, "destroy session");
     }
 
-    private void createSession() {
+    private synchronized void createSession() {
 
         String body = "{\n" +
                 "  \"Name\": \"" + MasterSlaveConfigurationUtil.INSTANCE_ID + "\",\n" +
@@ -136,7 +136,10 @@ public class ConsulMastershipElector implements MastershipElector {
                     HttpResponse response = consulClient.execute(renewSession);
                     if (!response.isSuccess()) {
                         String renewSessionResponse = response.getResponseAsString();
-                        LOGGER.error("failed to pass check. got response: {}, error response: {}", response.getStatus(), renewSessionResponse);
+                        LOGGER.warn("failed to pass check. got response: {}, error response: {}", response.getStatus(), renewSessionResponse);
+                        if(renewSessionResponse.contains("not found")){
+                            createSession();
+                        }
                     }
                 } catch (Exception e) {
                     LOGGER.warn("problem in heartbeat: {}", e.toString());
@@ -247,6 +250,7 @@ public class ConsulMastershipElector implements MastershipElector {
 
         HttpResponse response = consulClient.execute(acquireLock);
         String responseAsString = response.getResponseAsString();
+        String lockFailReason = "";
         if (!response.isSuccess()) {
             LOGGER.error("failed to acquire lock for key: {}. got response: {}, error response: {}", mastershipKey, response.getStatus(), responseAsString);
 
@@ -264,13 +268,16 @@ public class ConsulMastershipElector implements MastershipElector {
                 HttpResponse acquireLockRetryResponse = execute(acquireLock, false, "acquire lock");
                 if (acquireLockRetryResponse.isSuccess()) {
                     lockAcquired = Boolean.valueOf(acquireLockRetryResponse.getResponseAsString());
+                }else{
+                    lockFailReason = acquireLockRetryResponse.getResponseAsString();
                 }
             }
         } else {
             lockAcquired = Boolean.valueOf(responseAsString);
+            lockFailReason = "Successful response from consul with response for acquire lock: " + lockAcquired;
         }
 
-        LOGGER.debug("lock acquired: {}", lockAcquired);
+        LOGGER.debug("lock acquired: {}. reason: {}", lockAcquired, lockFailReason);
         return lockAcquired;
     }
 
