@@ -99,7 +99,8 @@ public class MasterSlaveRunnable implements Runnable {
                 } catch (Exception e1) {
                     LOGGER.error("problem running master slave thread for: {}. error is: {}", jobName, e1, e1);
                     if (slaveNextTimeInvoke.get()) {
-                        goSlave();
+                        String message = e.getMessage();
+                        goSlave("Error: " + message != null ? message : e.getClass().getSimpleName());
                     }
                 }
             } finally {
@@ -137,7 +138,7 @@ public class MasterSlaveRunnable implements Runnable {
                             }
                         } else {
                             if (slaveNextTimeInvoke.get()) {
-                                goSlave();
+                                goSlave("is-master logic returned false");
                             }
                         }
                         break;
@@ -155,7 +156,7 @@ public class MasterSlaveRunnable implements Runnable {
                             }
                         } else {
                             if (slaveNextTimeInvoke.get()) {
-                                goSlave();
+                                goSlave("is-master logic returned false");
                             }
                         }
                     }
@@ -163,10 +164,10 @@ public class MasterSlaveRunnable implements Runnable {
 
 
             } else if (slaveNextTimeInvoke.get()) { //Not active version
-                goSlave();
+                goSlave("Not Active Version");
             }
         } else if (!isActiveDC && slaveNextTimeInvoke.get()) { //Not active Datacenter
-            goSlave();
+            goSlave("Not Active DC");
         }
     }
 
@@ -199,13 +200,13 @@ public class MasterSlaveRunnable implements Runnable {
         LOGGER.info("{} is now master", MasterSlaveConfigurationUtil.INSTANCE_ID);
     }
 
-    public void goSlave() {
+    public void goSlave(String reason) {
         LOGGER.debug("{} is going to turn into slave", MasterSlaveConfigurationUtil.INSTANCE_ID);
         slaveNextTimeInvoke.set(Boolean.FALSE);
         masterNextTimeInvoke.set(Boolean.TRUE);
         mastershipElector.cleanupMaster();
         masterSlaveListener.goSlave();
-        LOGGER.info("{} is now slave", MasterSlaveConfigurationUtil.INSTANCE_ID);
+        LOGGER.info("{} is now slave. Reason: {}", MasterSlaveConfigurationUtil.INSTANCE_ID, reason);
     }
 
     private boolean isActiveDC() {

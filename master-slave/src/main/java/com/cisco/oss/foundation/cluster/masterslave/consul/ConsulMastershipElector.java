@@ -236,6 +236,7 @@ public class ConsulMastershipElector implements MastershipElector {
         if (getSessionResponse.isSuccess()) {
             String sessionOwner = JsonPath.using(nullableConf).parse(getSessionResponse.getResponseAsString()).read("$.[0].Session");
             if (StringUtils.isNoneBlank(sessionOwner)) {
+                LOGGER.trace("Lock is by session: {}", sessionOwner);
                 return sessionId.equals(sessionOwner);
             }
         }
@@ -250,7 +251,7 @@ public class ConsulMastershipElector implements MastershipElector {
 
         HttpResponse response = consulClient.execute(acquireLock);
         String responseAsString = response.getResponseAsString();
-        String lockFailReason = "";
+        String lockResponseReason = "";
         if (!response.isSuccess()) {
             LOGGER.error("failed to acquire lock for key: {}. got response: {}, error response: {}", mastershipKey, response.getStatus(), responseAsString);
 
@@ -268,16 +269,17 @@ public class ConsulMastershipElector implements MastershipElector {
                 HttpResponse acquireLockRetryResponse = execute(acquireLock, false, "acquire lock");
                 if (acquireLockRetryResponse.isSuccess()) {
                     lockAcquired = Boolean.valueOf(acquireLockRetryResponse.getResponseAsString());
+                    lockResponseReason = "Successful response from consul with response for acquire lock: " + lockAcquired;
                 }else{
-                    lockFailReason = acquireLockRetryResponse.getResponseAsString();
+                    lockResponseReason = acquireLockRetryResponse.getResponseAsString();
                 }
             }
         } else {
             lockAcquired = Boolean.valueOf(responseAsString);
-            lockFailReason = "Successful response from consul with response for acquire lock: " + lockAcquired;
+            lockResponseReason = "Successful response from consul with response for acquire lock: " + lockAcquired;
         }
 
-        LOGGER.debug("lock acquired: {}. reason: {}", lockAcquired, lockFailReason);
+        LOGGER.debug("lock acquired: {}. reason: {}", lockAcquired, lockResponseReason);
         return lockAcquired;
     }
 
