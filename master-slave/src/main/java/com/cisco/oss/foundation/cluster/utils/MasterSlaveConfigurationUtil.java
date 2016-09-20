@@ -180,20 +180,24 @@ public class MasterSlaveConfigurationUtil {
      * @return the component name. this is not unique and is shared by all instances of the component. see reference: https://github.com/foundation-runtime/cluster/wiki/Master-Slave#instance-identification
      */
     public static String getComponentName() {
-        String rpmSoftwareName = System.getenv(CcpConstants.RPM_SOFTWARE_NAME);
+        String applicationName = System.getenv(CcpConstants.RPM_SOFTWARE_NAME);
 
-        if (rpmSoftwareName == null) {
-            rpmSoftwareName = System.getenv(CcpConstants.ARTIFACT_NAME);
+        if (applicationName == null) {
+            applicationName = System.getenv(CcpConstants.ARTIFACT_NAME);
         }
 
-        if (rpmSoftwareName == null) {
-            rpmSoftwareName = System.getProperty(CcpConstants.RPM_SOFTWARE_NAME);
+        if (applicationName == null) {
+            applicationName = System.getProperty(CcpConstants.RPM_SOFTWARE_NAME);
         }
 
-        if (rpmSoftwareName == null) {
+        if (applicationName == null) {
+            applicationName = System.getProperty(CcpConstants.RPM_SOFTWARE_NAME);
+        }
+
+        if (applicationName == null) {
             throw new IllegalArgumentException(CcpConstants.RPM_SOFTWARE_NAME + " environment variable is mandatory when CCP is enabled");
         }
-        return rpmSoftwareName;
+        return applicationName;
     }
 
 

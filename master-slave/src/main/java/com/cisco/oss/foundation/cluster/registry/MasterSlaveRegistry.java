@@ -2,6 +2,9 @@ package com.cisco.oss.foundation.cluster.registry;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.Collections;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -19,6 +22,10 @@ public enum MasterSlaveRegistry {
     private ConcurrentMap<String, MasterSlaveListener> listeners = new ConcurrentHashMap<>();
     ConcurrentMap<String, Boolean> threadController = new ConcurrentHashMap<>();
     ConcurrentMap<String, Thread> masterSlaveThreads = new ConcurrentHashMap<>();
+
+    public Map<String, MasterSlaveListener> getListeners(){
+        return Collections.unmodifiableMap(listeners);
+    }
 
 
     /**
