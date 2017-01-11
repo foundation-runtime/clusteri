@@ -7,6 +7,8 @@ import com.cisco.oss.foundation.cluster.utils.MasterSlaveConfigurationUtil;
 import com.cisco.oss.foundation.configuration.CcpConstants;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.FindOneAndReplaceOptions;
+import com.mongodb.client.model.ReturnDocument;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.Document;
 import org.bson.conversions.Bson;
@@ -34,7 +36,7 @@ public class MongoMastershipElector implements MastershipElector {
     private Document document = null;
     private String id = null;
     private String jobName = null;
-    private int masterSlaveLeaseTime = -1;
+    private long masterSlaveLeaseTime = -1;
 
 
     @Override
@@ -89,11 +91,10 @@ public class MongoMastershipElector implements MastershipElector {
         document.put(LEASE_RENEWED, leaseRenewed);
 
 
-        long lastExpectedLeaseUpdateTime = leaseRenewed - masterSlaveLeaseTime * 1000;
-
+        long lastExpectedLeaseUpdateTime = leaseRenewed - masterSlaveLeaseTime * 1000L;
 
         Bson one = Filters.eq(MASTER_INSTANCE_ID, MasterSlaveConfigurationUtil.INSTANCE_ID);
-        Bson two = Filters.eq(LEASE_RENEWED, lastExpectedLeaseUpdateTime);
+        Bson two = Filters.gt(LEASE_RENEWED, lastExpectedLeaseUpdateTime);
         Bson first = Filters.and(one, two);
 
         Bson second = Filters.lte(LEASE_RENEWED,lastExpectedLeaseUpdateTime);
@@ -103,7 +104,10 @@ public class MongoMastershipElector implements MastershipElector {
         Bson updateLeaseQuery = Filters.and(Filters.eq(ID, this.id), query);
 
         LOGGER.trace("id: {}, leaseRenewed: {}, lease-time: {}, lastExpectedLeaseUpdateTime: {}", id, leaseRenewed, masterSlaveLeaseTime, lastExpectedLeaseUpdateTime);
-        Object updateDoc = masterSlaveCollection.findOneAndReplace(updateLeaseQuery, this.document);
+        FindOneAndReplaceOptions replaceOptions = new FindOneAndReplaceOptions();
+        replaceOptions.returnDocument(ReturnDocument.AFTER);
+        Object updateDoc = masterSlaveCollection.findOneAndReplace(updateLeaseQuery, this.document, replaceOptions);
+        LOGGER.trace("updatedDoc: {}", updateDoc);
 
         return updateDoc != null;
     }
