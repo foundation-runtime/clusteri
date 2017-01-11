@@ -1,8 +1,7 @@
 package com.cisco.oss.foundation.cluster.test;
 
 import com.allanbank.mongodb.bson.impl.EmptyDocument;
-import com.cisco.oss.foundation.cluster.masterslave.consul.ConsulMastershipElector;
-import com.cisco.oss.foundation.cluster.mongo.MongoClient;
+import com.cisco.oss.foundation.cluster.mongo.AsyncMongoClient;
 import com.cisco.oss.foundation.cluster.registry.MasterSlaveListener;
 import com.cisco.oss.foundation.cluster.registry.MasterSlaveRegistry;
 import com.cisco.oss.foundation.cluster.utils.MasterSlaveConfigurationUtil;
@@ -19,7 +18,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -101,7 +99,7 @@ public class RegistryTest {
         } catch (InterruptedException e) {
             Assert.fail(e.toString());
         }
-        MongoClient.INSTANCE.getMasterSlaveCollection().delete(EmptyDocument.INSTANCE);
+        AsyncMongoClient.INSTANCE.getMasterSlaveCollection().delete(EmptyDocument.INSTANCE);
         System.gc();
         MasterSlaveConfigurationUtil.setMongodbServers(new ArrayList<>());
 
