@@ -3,9 +3,9 @@ package com.cisco.oss.foundation.cluster.registry;
 import com.cisco.oss.foundation.cluster.masterslave.MastershipElector;
 import com.cisco.oss.foundation.cluster.masterslave.consul.ConsulMastershipElector;
 import com.cisco.oss.foundation.cluster.masterslave.consul.OpenstackConsulMastershipElector;
+import com.cisco.oss.foundation.cluster.masterslave.mongo.AsyncMongoMastershipElector;
 import com.cisco.oss.foundation.cluster.masterslave.mongo.MongoMastershipElector;
 import com.cisco.oss.foundation.cluster.utils.MasterSlaveConfigurationUtil;
-import com.cisco.oss.foundation.configuration.CcpConstants;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,6 +36,9 @@ public class MasterSlaveRunnable implements Runnable {
             }
             case "consul-openstack":{
                 return new OpenstackConsulMastershipElector();
+            }
+            case "async-mongo":{
+                return new AsyncMongoMastershipElector();
             }
             case "mongo":{
                 return new MongoMastershipElector();

@@ -1,19 +1,16 @@
 package com.cisco.oss.foundation.cluster.mongo;
 
-
-import com.allanbank.mongodb.Credential;
 import com.cisco.oss.foundation.cluster.utils.MasterSlaveConfigurationUtil;
-import com.mongodb.MongoClientOptions;
-import com.mongodb.MongoCredential;
-import com.mongodb.ServerAddress;
-import com.mongodb.client.MongoCollection;
-import com.mongodb.client.MongoDatabase;
 import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.Arrays;
+import com.allanbank.mongodb.Credential.Builder;
+import com.allanbank.mongodb.MongoClientConfiguration;
+import com.allanbank.mongodb.MongoCollection;
+import com.allanbank.mongodb.MongoDatabase;
+import com.allanbank.mongodb.MongoFactory;
+
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -22,11 +19,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Singleton wrapper over the Mongo Client Driver
  * Created by Yair Ogen (yaogen) on 14/01/2016.
  */
-public enum MongoClient {
+public enum AsyncMongoClient {
 
 	INSTANCE;
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(MongoClient.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(AsyncMongoClient.class);
 
 	private Logger logger = null;
 	private static final String DATA_CENTER_COLLECTION = "dataCenter";
@@ -42,55 +39,48 @@ public enum MongoClient {
 
 
 
-    MongoClient() {
+    AsyncMongoClient() {
 
-		logger = LoggerFactory.getLogger(MongoClient.class);
+		logger = LoggerFactory.getLogger(AsyncMongoClient.class);
 
-		if (MasterSlaveConfigurationUtil.isMongoAutoStart()) {
-			try {
-                database = connect();
-            } catch (MissingMongoConfigException e) {
-                throw e;
-            } catch (Exception e) {
-                infiniteConnect();
-            }
-
-			dataCenter	= database.getCollection(DATA_CENTER_COLLECTION);
-			masterSlave		= database.getCollection(MASTER_SLAVE_COLLECTION);
+		try {
+			database = connect();
+		} catch (MissingMongoConfigException e) {
+			throw e;
+		} catch (Exception e) {
+			infiniteConnect();
 		}
+
+		dataCenter	= database.getCollection(DATA_CENTER_COLLECTION);
+		masterSlave		= database.getCollection(MASTER_SLAVE_COLLECTION);
 	}
 
 
 	private MongoDatabase connect(){
+		MongoClientConfiguration config = new MongoClientConfiguration();
 		List<Pair<String, Integer>> mongodbServers = MasterSlaveConfigurationUtil.getMongodbServers();
-		List<ServerAddress> addresses = new ArrayList<>(mongodbServers.size());
 		for (Pair<String, Integer> mongodbServer : mongodbServers) {
-			addresses.add(new ServerAddress(mongodbServer.getLeft(), mongodbServer.getRight()));
+			config.addServer(mongodbServer.getLeft() + ":" + mongodbServer.getRight());
 		}
+    	config.setMaxConnectionCount(10);
 
-
-		MongoClientOptions options = MongoClientOptions.builder().connectionsPerHost(10)
-//				.threadsAllowedToBlockForConnectionMultiplier(threadsAllowedToBlockForConnectionMultiplier)
-//				.readPreference(readPreference)
-				.build();
-
-		com.mongodb.MongoClient mongoDBClient = null;
-		String dbName = MasterSlaveConfigurationUtil.getMongodbName();
-
+    	String dbName = MasterSlaveConfigurationUtil.getMongodbName();
+    	
 		if (MasterSlaveConfigurationUtil.isMongoAuthenticationEnabled()) {
 
+			Builder credentials = new Builder();
 			Pair<String, String> mongoUserCredentials = MasterSlaveConfigurationUtil.getMongoUserCredentials();
-			MongoCredential credential = MongoCredential.createCredential(mongoUserCredentials.getLeft(), dbName, mongoUserCredentials.getRight().toCharArray());
-			mongoDBClient = new com.mongodb.MongoClient(addresses, Arrays.asList(credential), options);
-		}else{
-			mongoDBClient = new com.mongodb.MongoClient(addresses, options);
+			credentials.userName(mongoUserCredentials.getLeft());
+			credentials.password(mongoUserCredentials.getRight().toCharArray());
+			credentials.setDatabase(dbName);
+			
+			config.addCredential(credentials);
 		}
 
-
-
-
     	
-    	database = mongoDBClient.getDatabase(dbName);
+    	com.allanbank.mongodb.MongoClient mongoClient = MongoFactory.createClient(config);
+    	
+    	database = mongoClient.getDatabase(dbName);
     	
 		//Check Authentication
 		try {
@@ -132,13 +122,6 @@ public enum MongoClient {
 				LOGGER.error("Uncaught Exception in thread: {}. Exception is: {}", t.getName(), e);
 			}
 		});
-	}
-
-	public void connect(com.mongodb.MongoClient mongoDBClient){
-		String dbName = MasterSlaveConfigurationUtil.getMongodbName();
-		database = mongoDBClient.getDatabase(dbName);
-		dataCenter	= database.getCollection(DATA_CENTER_COLLECTION);
-		masterSlave		= database.getCollection(MASTER_SLAVE_COLLECTION);
 	}
 
 	/**
