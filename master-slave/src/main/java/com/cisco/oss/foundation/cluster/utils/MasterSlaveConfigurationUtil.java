@@ -36,6 +36,7 @@ public class MasterSlaveConfigurationUtil {
     private static String mongoUserName = "";
     private static String mongoPassword = "";
     private static boolean isMongoAuthenticationEnabled = false;
+    private static boolean isMongoAutoStart = true;
 
     /**
      * When set to read mongo servers from configuration you can override the configuration prefix using this method.
@@ -112,6 +113,14 @@ public class MasterSlaveConfigurationUtil {
 
     public static boolean isMongoAuthenticationEnabled() {
         return isMongoAuthenticationEnabled;
+    }
+
+    public static void setIsMongoAutoStart(boolean isMongoAutoStart){
+        MasterSlaveConfigurationUtil.isMongoAutoStart = isMongoAutoStart;
+    }
+
+    public static boolean isMongoAutoStart() {
+        return isMongoAutoStart;
     }
 
     public static Pair<String, String> getMongoUserCredentials() {

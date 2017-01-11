@@ -1,18 +1,17 @@
 package com.cisco.oss.foundation.cluster.masterslave.mongo;
 
-import com.allanbank.mongodb.MongoCollection;
-import com.allanbank.mongodb.bson.Document;
-import com.allanbank.mongodb.bson.Element;
-import com.allanbank.mongodb.bson.builder.DocumentBuilder;
-import com.allanbank.mongodb.bson.builder.impl.DocumentBuilderImpl;
-import com.allanbank.mongodb.builder.ConditionBuilder;
-import com.allanbank.mongodb.builder.Find;
-import com.allanbank.mongodb.builder.QueryBuilder;
-import com.cisco.oss.foundation.cluster.masterslave.MastershipElector;
+
 import com.cisco.oss.foundation.cluster.mongo.MongoClient;
+import com.mongodb.DBObject;
+import com.mongodb.QueryBuilder;
+import com.mongodb.client.MongoCollection;
+import com.cisco.oss.foundation.cluster.masterslave.MastershipElector;
 import com.cisco.oss.foundation.cluster.utils.MasterSlaveConfigurationUtil;
 import com.cisco.oss.foundation.configuration.CcpConstants;
+import com.mongodb.client.model.Filters;
 import org.apache.commons.lang3.StringUtils;
+import org.bson.Document;
+import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,7 +45,7 @@ public class MongoMastershipElector implements MastershipElector {
         this.jobName = jobName;
         this.masterSlaveLeaseTime = MasterSlaveConfigurationUtil.getMasterSlaveLeaseTime(jobName);
         if (isReady()) {
-            document = masterSlaveCollection.findOne(QueryBuilder.where(ID).equals(this.id));
+            document = (Document) masterSlaveCollection.find(new Document(ID,this.id)).limit(1).first();
             if (document == null) {
                 document = createNewDocument();
             }
@@ -61,13 +60,13 @@ public class MongoMastershipElector implements MastershipElector {
     @Override
     public boolean isActiveVersion(String currentVersion) {
 
-        document = masterSlaveCollection.findOne(QueryBuilder.where(ID).equals(this.id));
+        document = (Document) masterSlaveCollection.find(new Document(ID,this.id)).limit(1).first();
         if (document == null) {
             document = createNewDocument();
         }
         LOGGER.trace("document in DB: {}", document);
-        Element activeVersionField = document.get(ACTIVE_VERSION);
-        String activeVersion = activeVersionField != null ? activeVersionField.getValueAsString() : null;
+        String activeVersionField = (String) document.get(ACTIVE_VERSION);
+        String activeVersion = activeVersionField != null ? activeVersionField : null;
 
         //if we don't need to be single across versions - we don't care what is the active version
         if (StringUtils.isNotBlank(activeVersion) && MasterSlaveConfigurationUtil.isSingleAcrossVersion(jobName)) {
@@ -81,58 +80,73 @@ public class MongoMastershipElector implements MastershipElector {
     public boolean isActiveDataCenter(String currentDataCenter) {
         //TODO do we want to prevent having multiple datacenter documents in this collection
         MongoCollection dataCenterCollection = MongoClient.INSTANCE.getDataCenterCollection();
-        ConditionBuilder datacenterQuery = QueryBuilder.where(ACTIVE_DATACENTER).equals(currentDataCenter);
-        Document document = dataCenterCollection.findOne(datacenterQuery);
+        Document document = (Document) dataCenterCollection.find(new Document(ACTIVE_DATACENTER,currentDataCenter)).limit(1).first();
         return document != null;
     }
 
     @Override
     public boolean isMaster() {
         long leaseRenewed = System.currentTimeMillis();
-        DocumentBuilder documentbuilder = new DocumentBuilderImpl(document);
-        documentbuilder.remove(MASTER_INSTANCE_ID);
-        documentbuilder.add(MASTER_INSTANCE_ID, MasterSlaveConfigurationUtil.INSTANCE_ID);
-        documentbuilder.remove(LEASE_RENEWED);
-        documentbuilder.add(LEASE_RENEWED, leaseRenewed);
-        document = documentbuilder.build();
+        document.put(MASTER_INSTANCE_ID, MasterSlaveConfigurationUtil.INSTANCE_ID);
+        document.put(LEASE_RENEWED, leaseRenewed);
+
 
 //        long lastExpectedLeaseUpdateTime = leaseRenewed - masterSlaveLeaseTime * 1000;
 //        ConditionBuilder timeQuery = QueryBuilder.where(LEASE_RENEWED).lessThanOrEqualTo(lastExpectedLeaseUpdateTime);
         long lastExpectedLeaseUpdateTime = leaseRenewed - masterSlaveLeaseTime * 1000;
 
-        ConditionBuilder instanceIdEqaulity = QueryBuilder.where(MASTER_INSTANCE_ID).equals(MasterSlaveConfigurationUtil.INSTANCE_ID);
-        ConditionBuilder leaseCondition = QueryBuilder.where(LEASE_RENEWED).greaterThan(lastExpectedLeaseUpdateTime);
 
-        Document first = QueryBuilder.and(instanceIdEqaulity, leaseCondition);
-        ConditionBuilder second = QueryBuilder.where(LEASE_RENEWED).lessThanOrEqualTo(lastExpectedLeaseUpdateTime);
+        Bson one = Filters.eq(MASTER_INSTANCE_ID, MasterSlaveConfigurationUtil.INSTANCE_ID);
+        Bson two = Filters.eq(LEASE_RENEWED, lastExpectedLeaseUpdateTime);
+        Bson first = Filters.and(one, two);
 
-        Document query = QueryBuilder.or(first, second);
-        Document updateLeaseQuery = QueryBuilder.and(QueryBuilder.where(ID).equals(this.id), query);
+//        QueryBuilder first = QueryBuilder.start(MASTER_INSTANCE_ID)
+//                .is(MasterSlaveConfigurationUtil.INSTANCE_ID)
+//                .and(LEASE_RENEWED).is(lastExpectedLeaseUpdateTime);
+
+//        ConditionBuilder instanceIdEqaulity = QueryBuilder.where(MASTER_INSTANCE_ID).equals(MasterSlaveConfigurationUtil.INSTANCE_ID);
+//        ConditionBuilder leaseCondition = QueryBuilder.where(LEASE_RENEWED).greaterThan(lastExpectedLeaseUpdateTime);
+
+//        QueryBuilder.start().and(instanceIdEqaulity,leaseCondition);
+
+//        Document first = QueryBuilder.and(instanceIdEqaulity, leaseCondition);
+//        QueryBuilder second = QueryBuilder.start(LEASE_RENEWED).lessThanEquals(lastExpectedLeaseUpdateTime);
+        Bson second = Filters.lte(LEASE_RENEWED,lastExpectedLeaseUpdateTime);
+//        ConditionBuilder second = QueryBuilder.where(LEASE_RENEWED).lessThanOrEqualTo(lastExpectedLeaseUpdateTime);
+
+        Bson query = Filters.or(first, second);
+
+//        QueryBuilder query = first.or(second.get());
+        Bson updateLeaseQuery = Filters.and(Filters.eq(ID, this.id), query);
+//        QueryBuilder updateLeaseQuery = query.and(QueryBuilder.start(ID).is(this.id).get());
+
+
+//        Document query = QueryBuilder.or(first, second);
+//        Document updateLeaseQuery = QueryBuilder.and(QueryBuilder.where(ID).equals(this.id), query);
 
         LOGGER.trace("id: {}, leaseRenewed: {}, lease-time: {}, lastExpectedLeaseUpdateTime: {}", id, leaseRenewed, masterSlaveLeaseTime, lastExpectedLeaseUpdateTime);
 //                    long numOfRowsUpdated = masterSlaveCollection.update(updateLeaseQuery, document,false, true);
-        long numOfRowsUpdated = masterSlaveCollection.update(updateLeaseQuery, this.document);
+//        long numOfRowsUpdated = masterSlaveCollection.update(updateLeaseQuery, this.document);
+        Object updateDoc = masterSlaveCollection.findOneAndReplace(updateLeaseQuery, this.document);
 
-        return numOfRowsUpdated > 0;
+        return updateDoc != null;
     }
 
     @Override
     public void close() {
         MongoCollection masterSlaveCollection = MongoClient.INSTANCE.getMasterSlaveCollection();
-        masterSlaveCollection.delete(QueryBuilder.where("instanceId").equals(MasterSlaveConfigurationUtil.INSTANCE_ID));
+        masterSlaveCollection.deleteOne(new Document("instanceId",MasterSlaveConfigurationUtil.INSTANCE_ID));
         document = null;
     }
 
     public Document createNewDocument() {
-        Document document;
-        DocumentBuilder documentbuilder = new DocumentBuilderImpl();
-        documentbuilder.add(ID, this.id);
-        documentbuilder.add(MASTER_INSTANCE_ID, MasterSlaveConfigurationUtil.INSTANCE_ID);
-        documentbuilder.add(COMPONENT, MasterSlaveConfigurationUtil.COMPONENT_NAME);
-        documentbuilder.add(JOB, jobName);
-        documentbuilder.add(LEASE_RENEWED, 0);
-        document = documentbuilder.build();
-        masterSlaveCollection.insert(documentbuilder);
+        Document document = new Document();
+        document.put(ID, this.id);
+        document.put(MASTER_INSTANCE_ID, MasterSlaveConfigurationUtil.INSTANCE_ID);
+        document.put(COMPONENT, MasterSlaveConfigurationUtil.COMPONENT_NAME);
+        document.put(JOB, jobName);
+        document.put(LEASE_RENEWED, 0);
+        masterSlaveCollection.insertOne(document);
         return document;
     }
 
