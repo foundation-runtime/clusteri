@@ -191,6 +191,8 @@ public class ConsulMastershipElector implements MastershipElector {
         boolean isActive = true;
         String consulValue = "";
 
+        boolean isLogged = false;
+
         HttpResponse response = consulClient.execute(getActiveKey);
         if (!response.isSuccess()) {
             LOGGER.debug("failed to get value from KV store for key: {}. got response: {}, error response: {}", key, response.getStatus(), response.getResponseAsString());
@@ -201,10 +203,15 @@ public class ConsulMastershipElector implements MastershipElector {
             if (StringUtils.isNotEmpty(valueInBase64)) {
                 consulValue = new String(BaseEncoding.base64().decode(valueInBase64));
                 isActive = currentValue.equals(consulValue);
+                if(!isActive){
+                    LOGGER.warn("Env variable and consul value are not identical - check consul for possible error. This MAY be a problem (and maybe not).  env value: {}, consul key: {}, consul value: {}", currentValue, key, consulValue);
+                }
             }
         }
 
-        LOGGER.debug("isActive: {}, env value: {}, consul key: {}, consul value: {}", isActive, currentValue, key, consulValue);
+        if (!isLogged) {
+            LOGGER.debug("isActive: {}, env value: {}, consul key: {}, consul value: {}", isActive, currentValue, key, consulValue);
+        }
 
         return isActive;
     }
